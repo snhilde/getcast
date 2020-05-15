@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"syscall"
 	"fmt"
@@ -9,31 +10,19 @@ import (
 
 
 func main() {
-	// We can have either one or two arguments:
-	// Required: URL of the podcast's main Libsyn page.
-	// Optional: directory where the episodes will go.
-	var url string
-	var dir string
+	url := flag.String("u", "", "URL of the podcast's main Libsyn page")
+	dir := flag.String("d", "", "Optional, main getcast download directory")
+	eps := flag.Args()
 
-	switch len(os.Args) {
-	case 2:
-		url = os.Args[1]
-	case 3:
-		url = os.Args[1]
-		dir = os.Args[2]
-		// Validate (or create) the download directory.
-		if err := validateDir(dir); err != nil {
+	flag.Parse()
+
+	// Validate (or create) the download directory.
+	if *dir != "" {
+		if err := validateDir(*dir); err != nil {
 			fmt.Println(err)
-			usage()
 			os.Exit(1)
 		}
-	default:
-		fmt.Println("Invalid arguments")
-		usage()
-		os.Exit(1)
 	}
-
-	_ = url
 }
 
 // validateDir validates the provided download directory in these ways:
@@ -88,11 +77,4 @@ func validateDir(path string) error {
 	}
 
 	return nil
-}
-
-// usage prints the required and optional arguments to the program.
-func usage() {
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println(filepath.Base(os.Args[0]), "https://{podcast}.libsyn.com", "[path/to/Podcasts]")
 }
