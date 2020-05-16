@@ -6,7 +6,24 @@ import (
 	"syscall"
 	"fmt"
 	"path/filepath"
+	"io/ioutil"
+	"net/http"
+	"encoding/xml"
 )
+
+
+// Show is the main type. It holds information about the podcast and all of the available episodes.
+type Show struct {
+	Title      string  `xml:"channel>title"`
+	Episodes []episode `xml:"channel>item"`
+}
+
+// episode represents internal data related to each episode of the podcast.
+type episode struct {
+	Title  string `xml:"title"`
+	Number string `xml:"episode"` // full namespace: itunes:episode
+	Link   string `xml:"link"`
+}
 
 
 func main() {
@@ -22,6 +39,13 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+	}
+
+	// Let's see what data we have for this podcast.
+	show, err := getShowInfo(*url)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
@@ -77,4 +101,27 @@ func validateDir(path string) error {
 	}
 
 	return nil
+}
+
+// getShowInfo will parse the metadata and episode data for the show specified.
+func getShowInfo(url string) (Show, error) {
+	// Grab the show's RSS feed.
+	resp, err := http.Get(url + "/rss")
+	if err != nil {
+		return Show{}, fmt.Errorf("Invalid show homepage: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return Show{}, fmt.Errorf("Failed to read data: %v", err)
+	}
+
+	// Parse the RSS feed into an XML doc.
+	show := Show{}
+	if err := xml.Unmarshal(body, &show); err != nil {
+		return Show{}, fmt.Errorf("Error parsing xml: %v", err)
+	}
+
+	return show, nil
 }
