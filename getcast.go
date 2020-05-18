@@ -2,6 +2,7 @@ package getcast
 
 import (
 	"fmt"
+	"github.com/kennygrant/sanitize"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -15,60 +16,84 @@ import (
 
 
 type Podcast interface {
-	Build() error        // Build fetches and parses data about the show and its episodes.
-	Title() string       // Title returns the title of the show.
-	Episodes() []Episode // Episodes returns a list of episodes that are available to download.
+	Build() error             // Build fetches and parses data about the show and its episodes.
+	Title() string            // Title returns the title of the show.
+	Available() int           // Available returns the number of episodes available for download.
+	TitleOf(index int) string // TitleOf returns the title of the episode at the provided index.
+	NumberOf(index int) int   // NumberOf returns the episode number of the episode at the provided index.
+	LinkOf(index int) string  // LinkOf returns the download URL for the episode at the provided index.
 }
 
-// Episode represents internal data related to each episode of the podcast.
-type Episode struct {
-	Title  string // Title of the episode. If the standard title does not include an episode number, the module should
+// episode represents internal data related to each episode of the podcast.
+type episode struct {
+	number int    // Episode number
+	title  string // Title of the episode. If the standard title does not include an episode number, the module should
 	              // add one, preferably as a prefix.
-	Number int    // Episode number
-	Link   string // Link used to download the episode
+	link   string // Link used to download the episode
 }
 
 
 // Sync checks for and downloads new episodes. The returned number is the number of episodes actually downloaded.
-func Sync(p Podcast, path string) (int, error) {
-	// Ask the chosen module to collect data for the show and its episodes.
-	if err := p.Build(); err != nil {
-		return 0, err
-	}
-
-	title := p.Title()
-	if title == "" {
-		return 0, fmt.Errorf("Missing show title")
-	}
-
-	// Validate (or create) the download directory.
+func Sync(path string, shows ...Podcast) (int, error) {
 	// If no directory was specified, we'll assume Podcasts in the current directory.
 	if path == "" {
 		path = "./Podcasts"
 	}
-	dir, err := validateDir(path, title)
-	if err != nil {
-		return 0, err
-	}
-	fmt.Println("Syncing", title, "episodes into", dir)
 
-	// Figure out which episodes we want to download.
-	available := p.Episodes()
-	if len(available) == 0 {
-		return 0, fmt.Errorf("No episodes available for download")
-	}
-	want, err := selectEps(dir, available)
-	if err != nil {
-		return 0, err
+	total := 0
+	for i, show := range shows {
+		if show == nil {
+			return total, fmt.Errorf("Missing show %v", i)
+		}
+
+		// Ask the chosen module to collect data for the show and its episodes.
+		if err := show.Build(); err != nil {
+			return total, err
+		}
+
+		// Get show's title, and sanitize it so that it can safely be used in a filename.
+		title := sanitize.BaseName(show.Title())
+		titleSan := sanitize.BaseName(title)
+		if titleSan == "" {
+			return total, fmt.Errorf("Missing show title")
+		}
+
+		// Validate (or create) the download directory.
+		dir, err := validateDir(path, titleSan)
+		if err != nil {
+			return total, err
+		}
+		fmt.Println("Syncing", title, "episodes in", dir)
+
+		// Build the list of available episodes.
+		num := show.Available()
+		available := make([]episode, num)
+		for i := 0; i < num; i++ {
+			epNumber := show.NumberOf(i)
+			epTitle := sanitize.BaseName(show.TitleOf(i)) + ".mp3"
+			epLink := show.LinkOf(i)
+			available[i] = episode{number: epNumber, title: epTitle, link: epLink}
+		}
+
+		// Figure out which episodes we want to download.
+		want, err := selectEps(available, dir)
+		if err != nil {
+			return total, err
+		}
+		if len(want) == 0 {
+			fmt.Println("No new episodes available")
+			return total, nil
+		}
+
+		// Download those episodes.
+		got, err := downloadEps(want, dir)
+		total += got
+		if err != nil {
+			return total, err
+		}
 	}
 
-	if len(want) == 0 {
-		fmt.Println("No new episodes available")
-		return 0, nil
-	}
-
-	// Download those episodes.
-	return downloadEps(want, dir)
+	return total, nil
 }
 
 
@@ -140,11 +165,11 @@ func validateDir(path string, title string) (string, error) {
 
 // selectEps builds a list of episodes that we want to download, either by determining which episodes are newer than
 // what we already have or by determining what we don't have.
-func selectEps(dir string, available []Episode) ([]Episode, error) {
-	// Find the latest episode we have.
+func selectEps(available []episode, dir string) ([]episode, error) {
 	latestEp := -1
 	have := make(map[string]int)
 
+	// Find the latest episode we have.
 	walkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -158,7 +183,6 @@ func selectEps(dir string, available []Episode) ([]Episode, error) {
 		if number > latestEp {
 			latestEp = number
 		}
-
 		have[filename] = number
 
 		return nil
@@ -168,20 +192,20 @@ func selectEps(dir string, available []Episode) ([]Episode, error) {
 	}
 
 	// We now know what episodes we already have. Let's figure out which ones we need.
-	need := []Episode{}
+	need := []episode{}
 	if latestEp >= 0 {
 		// We know the number of the newest episode we currently have. Let's grab everything that is newer than it.
 		for _, v := range available {
-			if v.Number > latestEp {
+			if v.number > latestEp {
 				need = append(need, v)
 			}
 		}
 	} else {
 		// We either don't have any episodes or can't determine which is the most recent by episode number prefix. We'll
 		// compare what we have to what's available and download everything we don't already have.
-		fmt.Println("Cannot determine latest episode already downloaded. Syncing with all available episodes.")
+		fmt.Println("Cannot determine latest episode already downloaded. Syncing all available episodes.")
 		for _, v := range available {
-			if _, ok := have[v.Title]; !ok {
+			if _, ok := have[v.title]; !ok {
 				// We don't have this episode yet.
 				need = append(need, v)
 			}
@@ -192,7 +216,7 @@ func selectEps(dir string, available []Episode) ([]Episode, error) {
 }
 
 // downloadEps downloads the provided episodes and returns how many were actually downloaded.
-func downloadEps(want []Episode, dir string) (int, error) {
+func downloadEps(want []episode, dir string) (int, error) {
 	if len(want) == 0 || dir == "" {
 		return 0, fmt.Errorf("Invalid call")
 	}
@@ -201,7 +225,7 @@ func downloadEps(want []Episode, dir string) (int, error) {
 
 	for i, ep := range want {
 		// Create a save point.
-		filename := filepath.Join(dir, ep.Title)
+		filename := filepath.Join(dir, ep.title)
 		fmt.Println(filename)
 
 		file, err := os.Create(filename)
@@ -211,7 +235,7 @@ func downloadEps(want []Episode, dir string) (int, error) {
 		defer file.Close()
 
 		// Grab the file's data.
-		resp, err := http.Get(ep.Link)
+		resp, err := http.Get(ep.link)
 		if err != nil {
 			return i, err
 		}
@@ -231,6 +255,9 @@ func downloadEps(want []Episode, dir string) (int, error) {
 		if err != nil {
 			return i, err
 		}
+
+		// Because we've been mucking around with carriage returns, we need to manually move down a row.
+		fmt.Println()
 	}
 
 	return len(want), nil
@@ -287,6 +314,10 @@ func (pr *progress) Write(p []byte) (int, error) {
 // reduce will convert the number of bytes into its human-readable value (less than 1024) with SI unit suffix appended.
 var units = []string{"B", "K", "M", "G"}
 func reduce(n int) string {
+	if n <= 0 {
+		return "0B"
+	}
+
 	index := int(math.Log2(float64(n))) / 10
 	n >>= (10 * index)
 
