@@ -68,12 +68,12 @@ func (s *Show) Build() error {
 	// This might not be necessary, but let's just do a quick check on the episode numbers. If a number wasn't declared
 	// in the RSS feed, we'll try to pull it out from the episode's title. This will make parsing easier in the main
 	// module.
-	for _, v := range s.Episodes {
+	for i, v := range s.Episodes {
 		if v.number == 0 {
 			// Could actually be episode number 0. Might want to rework this.
-			v.guessNum()
+			s.Episodes[i].guessNum()
 			if v.number > 0 {
-				v.title = fmt.Sprintf("%v-%v", v.number, v.title)
+				s.Episodes[i].title = fmt.Sprintf("%v-%v", v.number, v.title)
 			}
 		}
 	}
@@ -210,7 +210,7 @@ func (e *episode) guessNum() {
 	}
 
 	// The first item will be the match's title, and the second will be the number found.
-	if number, err := strconv.Atoi(matches[1]); err != nil {
+	if number, err := strconv.Atoi(matches[1]); err == nil {
 		e.number = number
 	}
 }
