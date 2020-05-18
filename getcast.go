@@ -221,7 +221,11 @@ func downloadEps(want []episode, dir string) (int, error) {
 		return 0, fmt.Errorf("Invalid call")
 	}
 
-	fmt.Println("Downloading", len(want), "episodes")
+	if len(want) == 1 {
+		fmt.Println("Downloading", len(want), "episode")
+	} else {
+		fmt.Println("Downloading", len(want), "episodes")
+	}
 
 	for i, ep := range want {
 		// Create a save point.
