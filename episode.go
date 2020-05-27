@@ -22,6 +22,50 @@ type Episode struct {
 }
 
 
+// Download downloads the episode.
+func (e *Episode) Download(showDir string) error {
+	if showDir == "" {
+		return fmt.Errorf("Invalid call")
+	}
+
+	// Create a save point.
+	filename := filepath.Join(showDir, e.Title)
+	fmt.Println(filename)
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Grab the file's data.
+	resp, err := http.Get(e.Link)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Make sure we accessed everything correctly.
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("%v", resp.Status)
+	}
+
+	// Set up our progress bar.
+	bar := ProgressBar{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
+	tee := io.TeeReader(resp.Body, &bar)
+
+	// Save the file.
+	_, err = io.Copy(file, tee)
+	if err != nil {
+		return err
+	}
+
+	// Because we've been mucking around with carriage returns, we need to manually move down a row.
+	fmt.Println()
+
+	return nil
+}
+
 // For the <title> tag, there are two tags returned: a general one, and one in the "itunes" namespace. The general tag
 // usually has an episode number, while the other one does not. It will make everything easier if we save the podcast
 // with the episode number in the filename, so we want to prefer the general tag. However, the parser reads the "itunes"
@@ -90,50 +134,6 @@ func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 			}
 		}
 	}
-
-	return nil
-}
-
-// Download downloads the episode.
-func (e *Episode) Download(dir string) error {
-	if dir == "" {
-		return fmt.Errorf("Invalid call")
-	}
-
-	// Create a save point.
-	filename := filepath.Join(dir, e.Title)
-	fmt.Println(filename)
-
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Grab the file's data.
-	resp, err := http.Get(e.Link)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Make sure we accessed everything correctly.
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("%v", resp.Status)
-	}
-
-	// Set up our progress bar.
-	bar := ProgressBar{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
-	tee := io.TeeReader(resp.Body, &bar)
-
-	// Save the file.
-	_, err = io.Copy(file, tee)
-	if err != nil {
-		return err
-	}
-
-	// Because we've been mucking around with carriage returns, we need to manually move down a row.
-	fmt.Println()
 
 	return nil
 }
