@@ -10,12 +10,23 @@ import (
 	"math"
 )
 
+
+// Debug prints additional process information if debug mode is enabled.
+func Debug(a ...interface{}) {
+	if DebugMode {
+		a = append([]interface{}{"(DEBUG)"}, a...)
+		fmt.Println(a...)
+	}
+}
+
 // ValidateDir checks that these things are true about the provided directory:
 // - Path is an existing directory. If it isn't, we'll create it.
 // - Directory is either the main directory or the show's directory.
 // - Directory has read permissions
 // - Directory has write permissions
 func ValidateDir(path string) error {
+	Debug("Validating", path)
+
 	// Make sure the path is valid.
 	info, err := os.Stat(path)
 	if err != nil {
