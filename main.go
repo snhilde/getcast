@@ -8,10 +8,19 @@ import (
 	"strings"
 )
 
+var (
+	DebugMode bool
+)
+
 
 func main() {
 	downDir := flag.String("d", "", "directory where shows will be synced")
+	debugFlag := flag.Bool("debug", false, "enable debug mode")
 	flag.Parse()
+
+	if (*debugFlag) {
+		DebugMode = true
+	}
 
 	// Validate (or create) the download directory.
 	if err := ValidateDir(*downDir); err != nil {
