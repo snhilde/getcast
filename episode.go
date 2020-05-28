@@ -18,7 +18,7 @@ type Episode struct {
 	Title  string // Title of the episode.
 	Link   string // Link used to download the episode
 	Length int    // Episode size in bytes
-	MIME   string // MIME type
+	Ext    string // File extension
 }
 
 
@@ -112,7 +112,7 @@ func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 						}
 						e.Length = bytes
 					case "type":
-						e.MIME = v.Value
+						e.Ext = mimeToExt(v.Value)
 					}
 				}
 			case "episode":
@@ -136,4 +136,28 @@ func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	}
 
 	return nil
+}
+
+
+// mimeToExt finds the appropriate file extension based on the MIME type.
+func mimeToExt(mime string) string {
+	switch mime {
+	case "audio/aac":
+		return ".aac"
+	case "audio/midi", "audio/x-midi":
+		return ".midi"
+	case "audio/mpeg", "audio/mp3":
+		return ".mp3"
+	case "audio/ogg":
+		return ".oga"
+	case "audio/opus":
+		return ".opus"
+	case "audio/wav":
+		return ".wav"
+	case "audio/webm":
+		return ".weba"
+	}
+
+	// If we can't match a specific type, we'll default to mp3.
+	return ".mp3"
 }
