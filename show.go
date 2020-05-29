@@ -131,6 +131,12 @@ func (s *Show) Filter() error {
 		}
 	}
 
+	// Arrange orders in chronological order (feed listed them in reverse-chronological order).
+	length := len(want)
+	for i := 0; i < length/2; i++ {
+		want[i], want[length - 1 - i] = want[length - 1 - i], want[i]
+	}
+
 	s.Episodes = want
 
 	return nil
