@@ -82,7 +82,7 @@ func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 			return err
 		}
 
-		// When we find a start tag, we'll see if we have one of the three tags that we want to save.
+		// When we find a start tag, we'll see if we have one of the tags that we want to save.
 		if s, ok := t.(xml.StartElement); ok {
 			// xml.StartElement has two fields: Name and Attr. We only care about the name, of which there are two
 			// parts: Tag name (Local) and namespace (Space).
