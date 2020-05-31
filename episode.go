@@ -14,11 +14,14 @@ import (
 
 // Episode represents internal data related to each episode of the podcast.
 type Episode struct {
-	Number int    // Episode number
-	Title  string // Title of the episode.
-	Link   string // Link used to download the episode
-	Length int    // Episode size in bytes
-	Ext    string // File extension
+	Number   int       // Episode number
+	Title    string    // Title of the episode
+	Link     string    // Link used to download the episode
+	Length   int       // Episode size in bytes
+	Ext      string    // File extension
+
+	w        io.Writer // Writer that will writer the episode to disk
+	metaSeen bool      // true after metadata has been set while writing episode to disk
 }
 
 
@@ -28,10 +31,10 @@ func (e *Episode) Download(showDir string) error {
 		return fmt.Errorf("Invalid call")
 	}
 
-	// Create a save point.
 	filename := filepath.Join(showDir, e.Title)
 	fmt.Println(filename)
 
+	// Create a save point.
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -54,8 +57,11 @@ func (e *Episode) Download(showDir string) error {
 	bar := ProgressBar{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
 	tee := io.TeeReader(resp.Body, &bar)
 
+	// Wrap the file writer in an episode writer so we can add/modify the tag data.
+	wrapper := e.NewWrapper(file)
+
 	// Save the file.
-	_, err = io.Copy(file, tee)
+	_, err = io.Copy(wrapper, tee)
 	if err != nil {
 		return err
 	}
@@ -136,6 +142,32 @@ func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	}
 
 	return nil
+}
+
+func (e *Episode) NewWrapper(w io.Writer) io.Writer {
+	e.w = w
+
+	return e
+}
+
+// Write is used as a wrapper around another io.Writer to add or modify ID3v2 metadata.
+func (e *Episode) Write(p []byte) (int, error) {
+	if e == nil || e.w == nil {
+		return 0, io.ErrClosedPipe
+	}
+
+	// We only need to examine/add metadata at the beginning of the file.
+	if !e.metaSeen {
+		if err := e.writeMeta(p); err != nil {
+			return 0, err
+		}
+		e.metaSeen = true
+	}
+
+	return e.w.Write(p)
+}
+
+func (e *Episode) writeMeta(p []byte) error {
 }
 
 
