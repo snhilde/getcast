@@ -1,27 +1,28 @@
 package main
 
 import (
-	"encoding/xml"
+	"io"
 	"fmt"
-	"github.com/kennygrant/sanitize"
-	"strconv"
 	"path/filepath"
 	"os"
 	"net/http"
-	"io"
+	"encoding/xml"
+	"github.com/kennygrant/sanitize"
+	"strconv"
 )
 
 
 // Episode represents internal data related to each episode of the podcast.
 type Episode struct {
-	Number   int       // Episode number
-	Title    string    // Title of the episode
-	Link     string    // Link used to download the episode
-	Length   int       // Episode size in bytes
-	Ext      string    // File extension
+	Number   int       // episode number
+	Title    string    // title of the episode
+	Link     string    // link used to download the episode
+	Length   int       // episode size in bytes
+	Ext      string    // file extension
 
-	w        io.Writer // Writer that will writer the episode to disk
-	metaSeen bool      // true after metadata has been set while writing episode to disk
+	metaDone bool      // true after metadata has been written to disk
+	meta     Meta       // buffer that will hold metadata as it's built
+	w        io.Writer // writer that will write the episode to disk
 }
 
 
@@ -156,18 +157,31 @@ func (e *Episode) Write(p []byte) (int, error) {
 		return 0, io.ErrClosedPipe
 	}
 
-	// We only need to examine/add metadata at the beginning of the file.
-	if !e.metaSeen {
-		if err := e.writeMeta(p); err != nil {
-			return 0, err
+	if !e.metaDone {
+		meta, err := e.meta.Build(p)
+		if err != nil {
+			return len(p), err
 		}
-		e.metaSeen = true
+
+		if meta == nil {
+			// We need more file data to write out the complete metadata.
+			return len(p), err
+		}
+
+		// We have all the metadata. Let's write it to disk (and any other file data included in this chunk).
+		if n, err := e.w.Write(meta); err != nil {
+			return len(p), err
+		} else if n != len(meta) {
+			return len(p), fmt.Errorf("Failed to write complete metadata")
+		}
+
+		// If we're here, then all metadata has been successfully written to disk. We can resume with writing the
+		// file data now.
+		e.metaDone = true
+		return len(p), nil
 	}
 
 	return e.w.Write(p)
-}
-
-func (e *Episode) writeMeta(p []byte) error {
 }
 
 
