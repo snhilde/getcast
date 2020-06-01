@@ -19,10 +19,6 @@ type Episode struct {
 	Link     string    // link used to download the episode
 	Length   int       // episode size in bytes
 	Ext      string    // file extension
-
-	metaDone bool      // true after metadata has been written to disk
-	meta     Meta       // buffer that will hold metadata as it's built
-	w        io.Writer // writer that will write the episode to disk
 }
 
 
@@ -58,8 +54,8 @@ func (e *Episode) Download(showDir string) error {
 	bar := ProgressBar{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
 	tee := io.TeeReader(resp.Body, &bar)
 
-	// Wrap the file writer in an episode writer so we can add/modify the tag data.
-	wrapper := e.NewWrapper(file)
+	// Wrap the file writer in a metadata writer so we can add/modify the tag data.
+	wrapper := NewMeta(e, file)
 
 	// Save the file.
 	_, err = io.Copy(wrapper, tee)
@@ -69,6 +65,11 @@ func (e *Episode) Download(showDir string) error {
 
 	// Because we've been mucking around with carriage returns, we need to manually move down a row.
 	fmt.Println()
+
+	// Make sure there wasn't a problem writing the metadata.
+	if !wrapper.Finished() {
+		return fmt.Errorf("Unexpectedly failed to write metadata")
+	}
 
 	return nil
 }
@@ -144,46 +145,6 @@ func (e *Episode) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 
 	return nil
 }
-
-func (e *Episode) NewWrapper(w io.Writer) io.Writer {
-	e.w = w
-
-	return e
-}
-
-// Write is used as a wrapper around another io.Writer to add or modify ID3v2 metadata.
-func (e *Episode) Write(p []byte) (int, error) {
-	if e == nil || e.w == nil {
-		return 0, io.ErrClosedPipe
-	}
-
-	if !e.metaDone {
-		meta, err := e.meta.Build(p)
-		if err != nil {
-			return len(p), err
-		}
-
-		if meta == nil {
-			// We need more file data to write out the complete metadata.
-			return len(p), err
-		}
-
-		// We have all the metadata. Let's write it to disk (and any other file data included in this chunk).
-		if n, err := e.w.Write(meta); err != nil {
-			return len(p), err
-		} else if n != len(meta) {
-			return len(p), fmt.Errorf("Failed to write complete metadata")
-		}
-
-		// If we're here, then all metadata has been successfully written to disk. We can resume with writing the
-		// file data now.
-		e.metaDone = true
-		return len(p), nil
-	}
-
-	return e.w.Write(p)
-}
-
 
 // mimeToExt finds the appropriate file extension based on the MIME type.
 func mimeToExt(mime string) string {
