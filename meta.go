@@ -97,8 +97,7 @@ func (m *Meta) metadata() map[string]string {
 
 	metadata := bytes.NewBuffer(m.filedata.Next(length))
 	for metadata.Len() > 0 {
-		header := metadata.Next(10)
-		id := string(header[0:4])
+		id := string(metadata.Next(4))
 		size := readLen(metadata, 4)
 		flags := metadata.Next(2)
 		field := string(metadata.Next(size))
@@ -108,9 +107,7 @@ func (m *Meta) metadata() map[string]string {
 			continue
 		}
 
-		if len(field) > 0 {
-			tags[id] = field
-		}
+		tags[id] = field
 	}
 
 	return tags
@@ -172,8 +169,7 @@ func (m *Meta) buildMetadata(fields map[string]string, e *Episode) ([]byte, erro
 		return nil, fmt.Errorf("Invalid meta object, cannot build metadata")
 	}
 
-	buf := new(bytes.Buffer)
-	// TODO: construct the metadata.
+	frames := new(bytes.Buffer)
 }
 
 
