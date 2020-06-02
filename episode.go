@@ -67,7 +67,7 @@ func (e *Episode) Download(showDir string) error {
 	fmt.Println()
 
 	// Make sure there wasn't a problem writing the metadata.
-	if !wrapper.Finished() {
+	if !wrapper.Written() {
 		return fmt.Errorf("Unexpectedly failed to write metadata")
 	}
 
