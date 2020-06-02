@@ -8,69 +8,69 @@ import (
 
 
 type Meta struct {
-	file     *os.File
-	written   bool         // whether or not the metadata has been written to disk
-	filedata *bytes.Buffer // buffer to store filedata between successive Write operations
+	filedata *bytes.Buffer      // buffer to store filedata between successive Write operations
+	exFields  map[string]string // additional fields to write to the metadata, as passed in via AddFields
+	hasMeta   bool              // whether or not the file has any metadata.
 }
 
 
-func NewMeta(f *os.File) *Meta {
-	m := new(Meta)
-
-	m.file = f
-
-	return m
+func NewMeta() *Meta {
+	return new(Meta)
 }
 
 
-// Write constructs and writes the file's metadata. There are multiple branches that can be taken, depending on whether
-// or not metadata is already present in the file. If metadata already exists, then Write will buffer data until it has
-// all of the metadata and then parse it, possibly modifying the contents. If metadata does not exist, then Write will
-// create it. When the metadata is ready to be written to disk, Write will construct it and write it. After that, if
-// Meta was created with an os.File object, it will pass on all non-meta filedata straight through to the next layer.
+// AddFields allows additional fields to be added to the metadata. If a field already exists, it will be overwritten
+// with the supplied data.
+func (m *Meta) AddFields(fields map[string]string) {
+	if m == nil {
+		return
+	}
+
+	m.exFields = fields
+}
+
+// Write buffers metadata into the internal buffer. When the metadata has been completely written, Write will stop
+// writing to the buffer and return (n, ErrShortWrite), with n designating how many bytes were consumed in this
+// operation.
 func (m *Meta) Write(p []byte) (int, error) {
 	if m == nil {
 		return 0, fmt.Errorf("Invalid meta object")
 	}
 
-	if !m.written {
-		if m.filedata == nil {
-			m.filedata = new(bytes.Buffer)
-		}
-		m.filedata.Write(p)
-
-		if !m.Buffered() {
-			// Continue buffering data.
-			return len(p), nil
-		}
-
-		if m.file != nil {
-			// Pull out the fields that are currently in the metadata.
-			fields := m.Fields()
-
-			// Reconstruct the new metadata.
-			meta := m.Build()
-
-			// Put it in front of the existing filedata.
-			data := append(meta, m.Filedata())
-
-			if n, err := m.file.Write(data); err != nil {
-				return len(p), err
-			} else if n != len(data) {
-				return len(p), fmt.Errorf("Failed to write complete metadata")
-			}
-		}
-
-		// If we're here, then all metadata has been successfully written. We can resume with writing the file data now.
-		m.written = true
-		return len(p), nil
+	if m.filedata == nil {
+		m.filedata = new(bytes.Buffer)
 	}
 
-	if m.file != nil {
-		// All metadata has already been written. Continue with writing the file.
-		return m.file.Write(p)
+	if !m.hasMeta || (m.hasMeta && m.Buffered()) {
+		// All metadata has already been written.
+		return 0, io.ErrShortWrite
 	}
-	return len(p), nil
+
+	tmp := bytes.NewBuffer(m.filedata.Bytes())
+	tmp.Write(p)
+
+	// Let's see how many more bytes we need to write to complete the metadata.
+	length := metaLen(tmp)
+	if length == 0 {
+		// The file doesn't start with any metadata.
+		m.hasMeta = false
+		return 0, io.ErrShortWrite
+	}
+
+	need := length - m.filedata.Len()
+	if len(p) <= need {
+		// We need all of these bytes.
+		return m.filedata.Write(p)
+	}
+
+	// We only need some of the bytes offered.
+	if n, err := m.filedata.Write(p[:need]); err != nil {
+		return n, err
+	} else if n != need {
+		return n, fmt.Errorf("Failed to write metadata")
+	}
+
+	return need, io.ErrShortWrite
 }
 
 // Fields pulls out the metadata fields currently in the file and builds a dictionary of id/field pairs from the file's
@@ -78,6 +78,9 @@ func (m *Meta) Write(p []byte) (int, error) {
 // fieldata.
 func (m *Meta) Fields() map[string]string {
 	tags := make(map[string]string)
+	if m.exFields != nil {
+		tags = m.exFields
+	}
 
 	if (m == nil || m.filedata == nil) {
 		return tags
@@ -113,7 +116,9 @@ func (m *Meta) Fields() map[string]string {
 			continue
 		}
 
-		tags[id] = field
+		if m.exFields != nil && _, ok := m.exFields[id]; !ok {
+			tags[id] = field
+		}
 	}
 
 	return tags
@@ -135,34 +140,13 @@ func (m * Meta) Buffered() bool {
 		return false
 	}
 
-	buf := bytes.NewBuffer(m.filedata.Bytes())
-	return skipMeta(buf)
-}
-
-// Filedata returns the body (non-meta portion) of the buffered audio file. This is not guaranteed to be the entire
-// audio file; only the currently buffered contents are returned.
-func (m *Meta) Filedata() []byte {
-	if m == nil || m.filedata == nil {
-		nil
-	}
-
-	buf := bytes.NewBuffer(m.filedata.Bytes())
-	if !skipMeta(buf) {
-		return nil
-	}
-
-	return buf.Bytes()
-}
-
-// Written checks if the metadata has been written or not.
-func (m *Meta) Written() bool {
-	if m == nil {
+	length := metaLen(m.filedata)
+	if length < 0 {
 		return false
 	}
 
-	return m.written
+	return m.filedata.Len() >= length
 }
-
 
 // Read a big-endian number of num bytes from the buffer. This will advance the buffer.
 func readLen(buf *bytes.Buffer, num int) int {
@@ -176,46 +160,49 @@ func readLen(buf *bytes.Buffer, num int) int {
 	return length
 }
 
-// skipMeta forwards the buffer past the metadata, stopping on the first byte of the body.
-func skipMeta(buf *bytes.Buffer) bool {
+// metaLen returns the reported length in bytes of the entire metadata, or -1 if the metadata could not be successfully
+// parsed (possibly indicating that more metadata is needed). It is not necessary to have the entire metadata buffered.
+// If no metadata exists in the file's contents, this will return 0.
+func metaLen(buf *bytes.Buffer) int {
 	if buf == nil {
 		return false
 	}
 
-	if string(buf.Next(3)) != "ID3" {
-		// The file does not contain any metadata and therefore has nothing to skip past.
-		return true
+	tmp := bytes.NewBuffer(buf.Bytes())
+	if tmp.Len() < 3 {
+		// Need more metadata.
+		return -1
+	}
+
+	if string(tmp.Next(3)) != "ID3" {
+		// The file does not contain any metadata.
+		return 0
 	}
 
 	// Read Major Version.
-	major, err := buf.ReadByte()
+	major, err := tmp.ReadByte()
 	if err != nil {
-		return false
+		return -1
 	}
 	// TODO: change logic based on major version
 
 	// Skip minor version.
-	if _, err := buf.ReadByte(); err != nil {
-		return false
+	if _, err := tmp.ReadByte(); err != nil {
+		return -1
 	}
 
 	// Skips flags.
 	// TODO: do we need to check for a footer here?
-	if _, err := buf.ReadByte(); err != nil {
-		return false
+	if _, err := tmp.ReadByte(); err != nil {
+		return -1
 	}
 
 	// Read metadata length.
-	length := readLen(buf, 4)
+	length := readLen(tmp, 4)
 	if length < 0 {
-		return false
+		return -1
 	}
 
-	if buf.Len() < length {
-		return false
-	}
-
-	frames := buf.Next(length)
-
-	return len(frames) == length
+	// Add 10 bytes for the header.
+	return length + 10
 }
