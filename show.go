@@ -18,6 +18,7 @@ type Show struct {
 	URL       *url.URL
 	Path       string
 	Title      string  `xml:"channel>title"`
+	Author     string  `xml:"channel>author"`
 	Episodes []Episode `xml:"channel>item"`
 }
 
@@ -51,8 +52,10 @@ func (s *Show) Sync(mainDir string) int {
 		return 0
 	}
 
-	for i, v := range s.Episodes {
-		if err := v.Download(s.Path); err != nil {
+	for i, episode := range s.Episodes {
+		episode.SetShowTitle(s.Title)
+		episode.SetShowArtist(s.Author)
+		if err := episode.Download(s.Path); err != nil {
 			fmt.Println("Error downloading episode:", err)
 			return i
 		}
@@ -74,18 +77,18 @@ func (s *Show) ReadFrom(r io.Reader) error {
 
 	s.Title = sanitize.BaseName(s.Title)
 
-	for i, v := range s.Episodes {
-		num := GuessNum(v.Title)
-		if num < 0 && v.Number > 0 {
+	for i, episode := range s.Episodes {
+		num := GuessNum(episode.Title)
+		if num < 0 && episode.Number > 0 {
 			// Prepend episode number if we have one but can't find it in the title.
-			v.Title = fmt.Sprintf("%v-%v", v.Number, v.Title)
-		} else if num > 0 && v.Number == 0 {
+			episode.Title = fmt.Sprintf("%v-%v", episode.Number, episode.Title)
+		} else if num > 0 && episode.Number == 0 {
 			// Save episode number if we have one in the title but not in the episode notes.
 			s.Episodes[i].Number = num
 		}
 
 		// Add the file extension.
-		s.Episodes[i].Title = v.Title + v.Ext
+		s.Episodes[i].Title = episode.Title + episode.Ext
 	}
 
 	return nil
@@ -117,16 +120,16 @@ func (s *Show) Filter() error {
 
 	want := []Episode{}
 	if latest > 0 {
-		for _, v := range s.Episodes {
-			if v.Number > latest {
-				want = append(want, v)
+		for _, episode := range s.Episodes {
+			if episode.Number > latest {
+				want = append(want, episode)
 			}
 		}
 	} else {
 		// We weren't able to determine the latest episode. We'll grab everything we don't already have.
-		for _, v := range s.Episodes {
-			if _, ok := have[v.Title]; !ok {
-				want = append(want, v)
+		for _, episode := range s.Episodes {
+			if _, ok := have[episode.Title]; !ok {
+				want = append(want, episode)
 			}
 		}
 	}
