@@ -207,11 +207,15 @@ func (m *Meta) parseFields() map[string]string {
 // parsed (possibly indicating that more metadata is needed). It is not necessary to have the entire metadata buffered.
 // If no metadata exists in the file's contents, this will return 0.
 func (m *Meta) length() int {
-	if m == nil || m.buffer == nil || m.buffer.Len() < 10 {
+	if m == nil || m.buffer == nil {
 		return -1
 	}
 
-	metadata := m.buffer.Bytes()
+	tmp := bytes.NewBuffer(buf.Bytes())
+	if tmp.Len() < 3 {
+		// Need more metadata to determine anything.
+		return -1
+	}
 
 	if string(tmp.Next(3)) != "ID3" {
 		// The file has data but not any metadata.
@@ -220,18 +224,31 @@ func (m *Meta) length() int {
 	}
 
 	// Read Major Version.
-	major, _ := tmp.ReadByte()
+	major, err := tmp.ReadByte()
+	if err != nil {
+		return -1
+	}
 	// TODO: change logic based on major version
 
 	// Skip minor version.
-	tmp.ReadByte()
+	if _, err := tmp.ReadByte(); err != nil {
+		return -1
+	}
 
 	// Skips flags.
 	// TODO: do we need to check for a footer here?
-	tmp.ReadByte()
+	if _, err := tmp.ReadByte(); err != nil {
+		return -1
+	}
 
-	// Read metadata length and add 10 bytes for the header.
-	return readLen(tmp, 4) + 10
+	// Read metadata length.
+	length := readLen(tmp, 4)
+	if length < 0 {
+		return -1
+	}
+
+	// Add 10 bytes for the header.
+	return length + 10
 }
 
 // Read a big-endian number of num bytes from the buffer. This will advance the buffer.
