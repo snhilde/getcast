@@ -7,22 +7,23 @@ import (
 	"io"
 	"io/ioutil"
 	"encoding/xml"
-	"github.com/kennygrant/sanitize"
 	"path/filepath"
 	"os"
+	"strconv"
 )
 
 
 // Show is the main type. It holds information about the podcast and its episodes.
 type Show struct {
 	URL       *url.URL
-	Path       string
+	Dir        string  // show's directory on disk
 	Title      string  `xml:"channel>title"`
 	Author     string  `xml:"channel>author"`
 	Episodes []Episode `xml:"channel>item"`
 }
 
 
+// Sync gets the current list of available episodes, determines which of them need to be downloaded, and then gets them.
 func (s *Show) Sync(mainDir string) int {
 	resp, err := http.Get(s.URL.String())
 	if err != nil {
@@ -31,13 +32,25 @@ func (s *Show) Sync(mainDir string) int {
 	}
 	defer resp.Body.Close()
 
-	if err := s.ReadFrom(resp.Body); err != nil {
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
 		fmt.Println("Error reading RSS feed:", err)
 		return 0
 	}
 
-	s.Path = filepath.Join(mainDir, s.Title)
-	if err := ValidateDir(s.Path); err != nil {
+	if err := xml.Unmarshal(data, s); err != nil {
+		fmt.Println("Error reading RSS feed:", err)
+		return 0
+	}
+
+	s.Title = Sanitize(s.Title)
+	if s.Title == "" {
+		fmt.Println("Error parsing RSS feed: No show title found")
+		return 0
+	}
+
+	s.Dir = filepath.Join(mainDir, s.Title)
+	if err := ValidateDir(s.Dir); err != nil {
 		fmt.Println("Invalid show directory:", err)
 		return 0
 	}
@@ -55,7 +68,7 @@ func (s *Show) Sync(mainDir string) int {
 	for i, episode := range s.Episodes {
 		episode.SetShowTitle(s.Title)
 		episode.SetShowArtist(s.Author)
-		if err := episode.Download(s.Path); err != nil {
+		if err := episode.Download(s.Dir); err != nil {
 			fmt.Println("Error downloading episode:", err)
 			return i
 		}
@@ -64,64 +77,20 @@ func (s *Show) Sync(mainDir string) int {
 	return len(s.Episodes)
 }
 
-// ReadFrom reads and parses feed data from the provided io.Reader.
-func (s *Show) ReadFrom(r io.Reader) error {
-	data, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-
-	if err := xml.Unmarshal(data, s); err != nil {
-		return err
-	}
-
-	s.Title = sanitize.BaseName(s.Title)
-
-	for i, episode := range s.Episodes {
-		num := GuessNum(episode.Title)
-		if num < 0 && episode.Number > 0 {
-			// Prepend episode number if we have one but can't find it in the title.
-			episode.Title = fmt.Sprintf("%v-%v", episode.Number, episode.Title)
-		} else if num > 0 && episode.Number == 0 {
-			// Save episode number if we have one in the title but not in the episode notes.
-			s.Episodes[i].Number = num
-		}
-
-		// Add the file extension.
-		s.Episodes[i].Title = episode.Title + episode.Ext
-	}
-
-	return nil
-}
-
-// Filter chooses which episodes need to be downloaded and discards the rest.
+// Filter filters out the episodes we don't want to download.
 func (s *Show) Filter() error {
-	have := make(map[string]string)
-	latest := 0
+	have := make(map[string]int)
+	latestSeason := 0
+	latestEpisode := 0
 
-	walkFunc := func(path string, info os.FileInfo, err error) error {
-		filename := info.Name()
-		if err != nil {
-			return err
-		} else if !isAudio(filename) {
-			return nil
-		}
-
-		have[filename] = filename
-		if num := GuessNum(filename); num > latest {
-			latest = num
-		}
-
-		return nil
-	}
-	if err := filepath.Walk(s.Path, walkFunc); err != nil {
+	if err := filepath.Walk(s.Dir, walkFunc); err != nil {
 		return err
 	}
 
 	want := []Episode{}
-	if latest > 0 {
+	if latestEpisode > 0 {
 		for _, episode := range s.Episodes {
-			if episode.Number > latest {
+			if episode.Season == latestSeason && episode.Number > latestEpisode {
 				want = append(want, episode)
 			}
 		}
@@ -134,7 +103,7 @@ func (s *Show) Filter() error {
 		}
 	}
 
-	// Arrange orders in chronological order (feed listed them in reverse-chronological order).
+	// Feed will list episodes newest to oldest. We'll reverse that here to make error handling easier later on.
 	length := len(want)
 	for i := 0; i < length/2; i++ {
 		want[i], want[length - 1 - i] = want[length - 1 - i], want[i]
@@ -145,6 +114,55 @@ func (s *Show) Filter() error {
 	return nil
 }
 
+
+// walkFunc is used by filepath's Walk to inspect every episode in a show's directory, compile a list of current
+// episodes, and try to determine the latest episode.
+func walkFunc(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		return err
+	}
+
+	filename := info.Name()
+	if !isAudio(filename) {
+		return nil
+	}
+
+	file, err := os.Open(filepath.Join(path, filename))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	contents, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	meta := NewMeta(contents)
+	season := 0
+	if value := meta.GetField("TPOS"); value != "" {
+		if num, err := strconv.Atoi(season); err == nil {
+			season = num
+			if season > latestSeason {
+				latestSeason = season
+			}
+		}
+	}
+
+	episode := 0
+	if value := meta.GetField("TRCK"); value != "" {
+		if num, err := strconv.Atoi(episode); err == nil {
+			episode = num
+			if episode > latestEpisode && season == latestSeason {
+				latestEpisode = episode
+			}
+		}
+	}
+
+	have[filename] = episode
+
+	return nil
+}
 
 // isAudio determines if the provided file is an audio file or not.
 func isAudio(filename string) bool {
