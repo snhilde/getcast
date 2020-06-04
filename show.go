@@ -19,6 +19,7 @@ type Show struct {
 	Dir        string  // show's directory on disk
 	Title      string  `xml:"channel>title"`
 	Author     string  `xml:"channel>author"`
+	Image      string  `xml:"channel>image"`
 	Episodes []Episode `xml:"channel>item"`
 }
 
