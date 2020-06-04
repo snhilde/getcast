@@ -49,6 +49,12 @@ func (s *Show) Sync(mainDir string) int {
 		return 0
 	}
 
+	for i, e := range s.Episodes {
+		e.SetShowTitle(s.Title)
+		e.SetShowArtist(s.Author)
+		e.Title = Sanitize(e.Title) + mimeToExt(e.Type)
+	}
+
 	s.Dir = filepath.Join(mainDir, s.Title)
 	if err := ValidateDir(s.Dir); err != nil {
 		fmt.Println("Invalid show directory:", err)
@@ -65,10 +71,10 @@ func (s *Show) Sync(mainDir string) int {
 		return 0
 	}
 
-	for i, episode := range s.Episodes {
-		episode.SetShowTitle(s.Title)
-		episode.SetShowArtist(s.Author)
-		if err := episode.Download(s.Dir); err != nil {
+	for i, e := range s.Episodes {
+		e.SetShowTitle(s.Title)
+		e.SetShowArtist(s.Author)
+		if err := e.Download(s.Dir); err != nil {
 			fmt.Println("Error downloading episode:", err)
 			return i
 		}
@@ -159,6 +165,29 @@ func (s *Show) filter() error {
 	return nil
 }
 
+
+// mimeToExt finds the appropriate file extension based on the MIME type.
+func mimeToExt(mime string) string {
+	switch mime {
+	case "audio/aac":
+		return ".aac"
+	case "audio/midi", "audio/x-midi":
+		return ".midi"
+	case "audio/mpeg", "audio/mp3":
+		return ".mp3"
+	case "audio/ogg":
+		return ".oga"
+	case "audio/opus":
+		return ".opus"
+	case "audio/wav":
+		return ".wav"
+	case "audio/webm":
+		return ".weba"
+	}
+
+	// If we can't match a specific type, we'll default to mp3.
+	return ".mp3"
+}
 
 // isAudio determines if the provided file is an audio file or not.
 func isAudio(filename string) bool {
