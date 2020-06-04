@@ -55,7 +55,7 @@ func (s *Show) Sync(mainDir string) int {
 		return 0
 	}
 
-	if err := s.Filter(); err != nil {
+	if err := s.filter(); err != nil {
 		fmt.Println("Error selecting episodes:", err)
 		return 0
 	}
@@ -77,12 +77,57 @@ func (s *Show) Sync(mainDir string) int {
 	return len(s.Episodes)
 }
 
-// Filter filters out the episodes we don't want to download.
-func (s *Show) Filter() error {
+// filter filters out the episodes we don't want to download.
+func (s *Show) filter() error {
 	have := make(map[string]int)
 	latestSeason := 0
 	latestEpisode := 0
 
+	walkFunc := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		filename := info.Name()
+		if !isAudio(filename) {
+			return nil
+		}
+
+		file, err := os.Open(filepath.Join(path, filename))
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		meta := NewMeta(nil)
+		if _, err := io.Copy(meta, file); err != nil && err != io.ErrShortWrite {
+			return err
+		}
+
+		season := 0
+		if value := meta.GetField("TPOS"); value != "" {
+			if num, err := strconv.Atoi(season); err == nil {
+				season = num
+				if season > latestSeason {
+					latestSeason = season
+				}
+			}
+		}
+
+		episode := 0
+		if value := meta.GetField("TRCK"); value != "" {
+			if num, err := strconv.Atoi(episode); err == nil {
+				episode = num
+				if episode > latestEpisode && season == latestSeason {
+					latestEpisode = episode
+				}
+			}
+		}
+
+		have[filename] = episode
+
+		return nil
+	}
 	if err := filepath.Walk(s.Dir, walkFunc); err != nil {
 		return err
 	}
@@ -114,55 +159,6 @@ func (s *Show) Filter() error {
 	return nil
 }
 
-
-// walkFunc is used by filepath's Walk to inspect every episode in a show's directory, compile a list of current
-// episodes, and try to determine the latest episode.
-func walkFunc(path string, info os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
-
-	filename := info.Name()
-	if !isAudio(filename) {
-		return nil
-	}
-
-	file, err := os.Open(filepath.Join(path, filename))
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	contents, err := ioutil.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	meta := NewMeta(contents)
-	season := 0
-	if value := meta.GetField("TPOS"); value != "" {
-		if num, err := strconv.Atoi(season); err == nil {
-			season = num
-			if season > latestSeason {
-				latestSeason = season
-			}
-		}
-	}
-
-	episode := 0
-	if value := meta.GetField("TRCK"); value != "" {
-		if num, err := strconv.Atoi(episode); err == nil {
-			episode = num
-			if episode > latestEpisode && season == latestSeason {
-				latestEpisode = episode
-			}
-		}
-	}
-
-	have[filename] = episode
-
-	return nil
-}
 
 // isAudio determines if the provided file is an audio file or not.
 func isAudio(filename string) bool {
