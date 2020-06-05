@@ -129,7 +129,7 @@ func (m *Meta) GetFrame(frame string) string {
 	return m.frames[frame]
 }
 
-// SetFrame sets the frame with the value.
+// SetFrame sets the frame with the value. Value should be UTF-8 encoded.
 func (m *Meta) SetFrame(frame, value string) {
 	if m == nil {
 		return
@@ -253,6 +253,43 @@ func (m *Meta) parseFrames() error {
 	}
 
 	return nil
+}
+
+// buildFrames builds only the frames of the episode's metadata from the internal dictionary of id/value pairs.
+func (m *Meta) buildFrames() []byte {
+	if m == nil || !m.Buffered() {
+		return nil
+	}
+
+	if m.frames == nil {
+		if err := m.parseFrames(); err != nil {
+			return nil
+		}
+	}
+
+	buf := new(bytes.Buffer)
+	for id, value := range m.frames {
+		if len(id) != 4 {
+			continue
+		}
+
+		// Write ID.
+		buf.WriteString(strings.ToUpper(id))
+
+		// Write length. (+2 for encoding bytes around value.)
+		length := writeLen(int32(len(value) + 2))
+		buf.Write(length)
+
+		// Write flags.
+		buf.Write([]byte{0x00, 0x00})
+
+		// Write value. (0x03 header with 0x00 footer indicates that the value is UTF-8.)
+		buf.WriteByte(0x03)
+		buf.WriteString(value)
+		buf.WriteByte(0x00)
+	}
+
+	return buf.Bytes()
 }
 
 // length returns the reported length in bytes of the entire metadata, or -1 if the metadata could not be successfully
