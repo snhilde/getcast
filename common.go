@@ -34,7 +34,7 @@ func Reduce(n int) string {
 
 // Sanitize replaces any characters in the provided string that cannot be used in a directory/file name with "_".
 func Sanitize(name string) string {
-	illegalChars := []rune{"*", "\"", "?", "/", "\\", "<", ">", ":", "|"}
+	illegalChars := []string{"*", "\"", "?", "/", "\\", "<", ">", ":", "|"}
 	for _, char := range illegalChars {
 		name = strings.ReplaceAll(name, char, "_")
 	}
