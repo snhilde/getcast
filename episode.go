@@ -126,11 +126,11 @@ func (e *Episode) SetShowArtist(artist string) {
 }
 
 
-// addFrames fleshes out the metadata with information from the episode. If a field already exists in the metadata, it
+// addFrames fleshes out the metadata with information from the episode. If a frame already exists in the metadata, it
 // will not be overwritten with data from the RSS feed.
 func (e *Episode) addFrames() {
 	frames := []struct {
-		field string
+		frame string
 		value string
 	}{
 		// Show information
@@ -151,26 +151,27 @@ func (e *Episode) addFrames() {
 	}
 
 	for _, frame := range frames {
-		if e.meta.GetField(frame.field) == "" {
-			e.meta.SetField(frame.field, frame.value)
+		if e.meta.GetFrame(frame.frame) == "" {
+			e.meta.SetFrame(frame.frame, frame.value)
 		}
 	}
 
 	if e.Date != "" {
 		if time, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
-			if e.meta.Version() == "3" {
-				if e.meta.GetField("TYER") == "" {
-					e.meta.SetField("TYER", time.Format("2006")) // YYYY
+			switch e.meta.Version() {
+			case "3":
+				if e.meta.GetFrame("TYER") == "" {
+					e.meta.SetFrame("TYER", time.Format("2006")) // YYYY
 				}
-				if e.meta.GetField("TDAT") == "" {
-					e.meta.SetField("TDAT", time.Format("0201")) // DDMM
+				if e.meta.GetFrame("TDAT") == "" {
+					e.meta.SetFrame("TDAT", time.Format("0201")) // DDMM
 				}
-				if e.meta.GetField("TIME") == "" {
-					e.meta.SetField("TIME", time.Format("1504")) // HHMM
+				if e.meta.GetFrame("TIME") == "" {
+					e.meta.SetFrame("TIME", time.Format("1504")) // HHMM
 				}
-			} else {
-				if e.meta.GetField("TDRC") == "" {
-					e.meta.SetField("TDRC", time.Format("20060102T150405")) // YYYYMMDDTHHMMSS
+			case "4":
+				if e.meta.GetFrame("TDRC") == "" {
+					e.meta.SetFrame("TDRC", time.Format("20060102T150405")) // YYYYMMDDTHHMMSS
 				}
 			}
 		}

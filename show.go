@@ -53,7 +53,7 @@ func (s *Show) Sync(mainDir string) int {
 	for i, e := range s.Episodes {
 		e.SetShowTitle(s.Title)
 		e.SetShowArtist(s.Author)
-		e.Title = Sanitize(e.Title) + mimeToExt(e.Type)
+		s.Episodes[i].Title = Sanitize(e.Title) + mimeToExt(e.Type)
 	}
 
 	s.Dir = filepath.Join(mainDir, s.Title)
@@ -112,8 +112,8 @@ func (s *Show) filter() error {
 		}
 
 		season := 0
-		if value := meta.GetField("TPOS"); value != "" {
-			if num, err := strconv.Atoi(season); err == nil {
+		if value := meta.GetFrame("TPOS"); value != "" {
+			if num, err := strconv.Atoi(value); err == nil {
 				season = num
 				if season > latestSeason {
 					latestSeason = season
@@ -122,8 +122,8 @@ func (s *Show) filter() error {
 		}
 
 		episode := 0
-		if value := meta.GetField("TRCK"); value != "" {
-			if num, err := strconv.Atoi(episode); err == nil {
+		if value := meta.GetFrame("TRCK"); value != "" {
+			if num, err := strconv.Atoi(value); err == nil {
 				episode = num
 				if episode > latestEpisode && season == latestSeason {
 					latestEpisode = episode
@@ -142,7 +142,9 @@ func (s *Show) filter() error {
 	want := []Episode{}
 	if latestEpisode > 0 {
 		for _, episode := range s.Episodes {
-			if episode.Season == latestSeason && episode.Number > latestEpisode {
+			season, _ := strconv.Atoi(episode.Season)
+			number, _ := strconv.Atoi(episode.Number)
+			if season == latestSeason && number > latestEpisode {
 				want = append(want, episode)
 			}
 		}
