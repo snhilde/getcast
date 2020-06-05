@@ -1,9 +1,10 @@
 package main
 
 import (
-	"os"
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
 	"golang.org/x/text/encoding/unicode"
 )
 
@@ -12,7 +13,7 @@ type Meta struct {
 	buffer   *bytes.Buffer      // buffer to store filedata between successive Write operations
 	buffered  bool              // whether or not all metadata is present in the buffer
 	noMeta    bool              // whether or not the file has any metadata
-	fields    map[string]string // cached dictionary of fields
+	frames    map[string]string // cached dictionary of frames
 }
 
 
@@ -111,58 +112,90 @@ func (m *Meta) Version() string {
 	return fmt.Sprintf("%v", data[3])
 }
 
-// GetField returns the value of the specified field, or "" if no field exists with that name. The name will be matched
+// GetFrame returns the value of the specified frame, or "" if no frame exists with that name. The name will be matched
 // in a case-sensitive comparison.
-func (m *Meta) GetField(field string) string {
+func (m *Meta) GetFrame(frame string) string {
 	if m == nil {
 		return ""
 	}
 
-	// If we haven't cached the fields yet, do so now.
-	if m.fields == nil {
-		m.fields = m.parseFields()
+	// If we haven't cached the frames yet, do so now.
+	if m.frames == nil {
+		if err := m.parseFrames(); err != nil {
+			return ""
+		}
 	}
 
-	if m.fields == nil {
-		return ""
-	}
-
-	return m.fields[field]
+	return m.frames[frame]
 }
 
-// SetField sets the field with the value.
-func (m *Meta) SetField(field, value string) {
+// SetFrame sets the frame with the value.
+func (m *Meta) SetFrame(frame, value string) {
 	if m == nil {
 		return
 	}
 
-	// If we haven't cached the fields yet, do so now.
-	if m.fields == nil {
-		m.fields = m.parseFields()
+	// If we haven't cached the frames yet, do so now.
+	if m.frames == nil {
+		if err := m.parseFrames(); err != nil {
+			return
+		}
 	}
 
-	if m.fields != nil {
-		m.fields[field] = value
+	if len(frame) == 4 {
+		m.frames[strings.ToUpper(frame)] = value
 	}
 }
 
-// Build constructs the metadata for the episode's file.
+// Build constructs the metadata for the episode's file. If the metadata cannot be constructed, this will return nil.
 func (m *Meta) Build() []byte {
 	if m == nil {
 		return nil
 	}
 
-	// TODO
-	frames := new(bytes.Buffer)
-	return frames.Bytes()
+	// Build out the frames first so we know how long the metadata is.
+	frames := m.buildFrames()
+	if frames == nil {
+		return nil
+	}
+
+	metadata := new(bytes.Buffer)
+
+	// Write ID.
+	metadata.WriteString("ID3")
+
+	// Write major version.
+	metadata.WriteByte(m.buffer.Bytes()[3])
+
+	// Write minor version.
+	metadata.WriteByte(0x00)
+
+	// Write flags.
+	metadata.WriteByte(0x00)
+
+	// Write length.
+	length := writeLen(int32(len(frames)))
+	metadata.Write(length)
+
+	// Write frames.
+	metadata.Write(frames)
+
+	return metadata.Bytes()
 }
 
 
-// parseFields returns a dictionary of all fields (represented as id/value pairs) in the metadata. On error or if there
-// is no metadata present, this will return nil. If metadata is present but no fields exist, this will return an empty,
-// non-nil dictionary.
-func (m *Meta) parseFields() map[string]string {
-	if !m.Buffered() || m.noMeta {
+// parseFrames creates the internal dictionary of all frames (represented as id/value pairs) in the metadata. If no
+// metadata is present or metadata is present but no frames exist, this will create an empty, non-nil dictionary.
+func (m *Meta) parseFrames() error {
+	if !m.Buffered() {
+		return fmt.Errorf("Missing metadata to parse")
+	} else if m.frames != nil {
+		return nil
+	}
+
+	m.frames = make(map[string]string)
+
+	if m.noMeta {
 		return nil
 	}
 
@@ -188,7 +221,6 @@ func (m *Meta) parseFields() map[string]string {
 		buf.Next(length - 4)
 	}
 
-	fields := make(map[string]string)
 	for buf.Len() > 0 {
 		id := buf.Next(4)
 		size := readLen(buf, 4)
@@ -200,29 +232,28 @@ func (m *Meta) parseFields() map[string]string {
 			switch value[0] {
 			case 0x00:
 				// ASCII characters. Remove the first and last bytes.
-				value = value[1:len(tmp)-1]
+				value = value[1:len(value)-1]
 			case 0x01:
 				// UTF-16 with BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
-				value = value[1:len(tmp)-2]
+				value = value[1:len(value)-2]
 				decoder := unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder()
 				value, _ = decoder.Bytes(value)
 			case 0x02:
 				// UTF-16 Big Endian without BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
-				value = value[1:len(tmp)-2]
+				value = value[1:len(value)-2]
 				decoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
 				value, _ = decoder.Bytes(value)
 			case 0x03:
 				// UTF-8 (Unicode). Remove the first and last bytes.
-				value = value[1:len(tmp)-1]
+				value = value[1:len(value)-1]
 			}
 
-			fields[string(id)] = string(value)
+			m.frames[string(id)] = string(value)
 		}
 	}
 
-	return fields
+	return nil
 }
-
 
 // length returns the reported length in bytes of the entire metadata, or -1 if the metadata could not be successfully
 // parsed (possibly indicating that more metadata is needed). It is not necessary to have the entire metadata buffered.
@@ -244,7 +275,7 @@ func (m *Meta) length() int {
 		return 0
 	}
 
-	// Skip Major Version.
+	// Skip major version.
 	if _, err := buf.ReadByte(); err != nil {
 		return -1
 	}
@@ -269,8 +300,9 @@ func (m *Meta) length() int {
 	return length + 10
 }
 
-// Read a big-endian number of num bytes from the buffer. This will advance the buffer. If num bytes are not available,
-// this will return -1.
+
+// readLen reads a big-endian number of num bytes from the buffer. This will advance the buffer. If num bytes are not
+// available, this will return -1.
 func readLen(buf *bytes.Buffer, num int) int {
 	if buf == nil || num < 0 || buf.Len() < num {
 		return -1
@@ -288,4 +320,17 @@ func readLen(buf *bytes.Buffer, num int) int {
 	}
 
 	return length
+}
+
+// writeLen converts the 32-bit integer into a byte slice, big-endian.
+func writeLen(n int32) []byte {
+	buf := new(bytes.Buffer)
+
+	for i := 0; i < 4; i++ {
+		tmp := n
+		tmp >>= (3 - i) * 8
+		buf.WriteByte(byte(tmp & 0xFF))
+	}
+
+	return buf.Bytes()
 }
