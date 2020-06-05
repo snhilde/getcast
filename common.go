@@ -1,13 +1,13 @@
 package main
 
 import (
-	"os"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
+	"os"
 	"path/filepath"
 	"syscall"
-	"regexp"
-	"strconv"
-	"math"
 )
 
 
@@ -17,6 +17,29 @@ func Debug(a ...interface{}) {
 		a = append([]interface{}{"(DEBUG)"}, a...)
 		fmt.Println(a...)
 	}
+}
+
+// Reduce converts the number of bytes into its human-readable value (less than 1024) with SI unit suffix appended.
+var units = []string{"B", "K", "M", "G"}
+func Reduce(n int) string {
+	if n <= 0 {
+		return "0B"
+	}
+
+	index := int(math.Log2(float64(n))) / 10
+	n >>= (10 * index)
+
+	return strconv.Itoa(n) + units[index]
+}
+
+// Sanitize replaces any characters in the provided string that cannot be used in a directory/file name with "_".
+func Sanitize(name string) string {
+	illegalChars := []rune{"*", "\"", "?", "/", "\\", "<", ">", ":", "|"}
+	for _, char := range illegalChars {
+		name = strings.ReplaceAll(name, char, "_")
+	}
+
+	return name
 }
 
 // ValidateDir checks that these things are true about the provided directory:
@@ -71,36 +94,4 @@ func ValidateDir(path string) error {
 	}
 
 	return nil
-}
-
-// GuessNum attempts to parse out the episode's number from its title. If something is found, it will be returned. If
-// nothing is found, -1 will be returned. Currently, it will grab the first number it sees. Enhancing this would be a
-// good area for future development.
-var reNum = regexp.MustCompile("^[[:print:]]*?([[:digit:]]+)[[:print:]]*$")
-func GuessNum(title string) int {
-	matches := reNum.FindStringSubmatch(title)
-	if len(matches) < 2 {
-		return -1
-	}
-
-	// The first item will be the matching title, and the second will be the number found.
-	number, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return -1
-	}
-
-	return number
-}
-
-// Reduce converts the number of bytes into its human-readable value (less than 1024) with SI unit suffix appended.
-var units = []string{"B", "K", "M", "G"}
-func Reduce(n int) string {
-	if n <= 0 {
-		return "0B"
-	}
-
-	index := int(math.Log2(float64(n))) / 10
-	n >>= (10 * index)
-
-	return strconv.Itoa(n) + units[index]
 }
