@@ -4,6 +4,7 @@ import (
 	"os"
 	"bytes"
 	"fmt"
+	"golang.org/x/text/encoding/unicode"
 )
 
 
@@ -170,32 +171,52 @@ func (m *Meta) parseFields() map[string]string {
 	// Skip past ID.
 	buf.Next(3)
 
-	// Read Major Version.
-	major, _ := buf.ReadByte()
-	// TODO: change logic based on major version.
+	// Skip major version.
+	buf.ReadByte()
 
 	// Skip minor version.
 	buf.ReadByte()
 
-	flags := buf.ReadByte()
-	// TODO: skip past extended header, if present
+	flags, _ := buf.ReadByte()
 
 	// Skip past the length.
 	buf.Next(4)
 
-	// TODO: handle footer
+	// Skip past the extended header, if present.
+	if flags & (1 << 6) > 0 {
+		length := readLen(buf, 4)
+		buf.Next(length - 4)
+	}
 
 	fields := make(map[string]string)
 	for buf.Len() > 0 {
-		id := string(buf.Next(4))
+		id := buf.Next(4)
 		size := readLen(buf, 4)
 		flags := buf.Next(2)
-		value := string(buf.Next(size))
+		value := buf.Next(size)
 
-		// If any of these flags are set, we want to ignore this frame.
-		// We only want the frame if all of these flags are not set.
+		// We only want the frame if these flags are not set.
 		if flags[1] & 0x0C == 0 {
-			fields[id] = value
+			switch value[0] {
+			case 0x00:
+				// ASCII characters. Remove the first and last bytes.
+				value = value[1:len(tmp)-1]
+			case 0x01:
+				// UTF-16 with BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
+				value = value[1:len(tmp)-2]
+				decoder := unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder()
+				value, _ = decoder.Bytes(value)
+			case 0x02:
+				// UTF-16 Big Endian without BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
+				value = value[1:len(tmp)-2]
+				decoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
+				value, _ = decoder.Bytes(value)
+			case 0x03:
+				// UTF-8 (Unicode). Remove the first and last bytes.
+				value = value[1:len(tmp)-1]
+			}
+
+			fields[string(id)] = string(value)
 		}
 	}
 
@@ -211,38 +232,35 @@ func (m *Meta) length() int {
 		return -1
 	}
 
-	tmp := bytes.NewBuffer(buf.Bytes())
-	if tmp.Len() < 3 {
+	buf := bytes.NewBuffer(m.buffer.Bytes())
+	if buf.Len() < 3 {
 		// Need more metadata to determine anything.
 		return -1
 	}
 
-	if string(tmp.Next(3)) != "ID3" {
+	if string(buf.Next(3)) != "ID3" {
 		// The file has data but not any metadata.
 		m.noMeta = true
 		return 0
 	}
 
-	// Read Major Version.
-	major, err := tmp.ReadByte()
-	if err != nil {
+	// Skip Major Version.
+	if _, err := buf.ReadByte(); err != nil {
 		return -1
 	}
-	// TODO: change logic based on major version
 
 	// Skip minor version.
-	if _, err := tmp.ReadByte(); err != nil {
+	if _, err := buf.ReadByte(); err != nil {
 		return -1
 	}
 
-	// Skips flags.
-	// TODO: do we need to check for a footer here?
-	if _, err := tmp.ReadByte(); err != nil {
+	// Skip flags.
+	if _, err := buf.ReadByte(); err != nil {
 		return -1
 	}
 
 	// Read metadata length.
-	length := readLen(tmp, 4)
+	length := readLen(buf, 4)
 	if length < 0 {
 		return -1
 	}
@@ -251,10 +269,19 @@ func (m *Meta) length() int {
 	return length + 10
 }
 
-// Read a big-endian number of num bytes from the buffer. This will advance the buffer.
+// Read a big-endian number of num bytes from the buffer. This will advance the buffer. If num bytes are not available,
+// this will return -1.
 func readLen(buf *bytes.Buffer, num int) int {
-	length := int(0)
+	if buf == nil || num < 0 || buf.Len() < num {
+		return -1
+	}
+
 	bytes := buf.Next(num)
+	if len(bytes) != num {
+		return -1
+	}
+
+	length := int(0)
 	for _, v := range bytes {
 		length <<= 8
 		length |= int(v)
