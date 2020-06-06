@@ -46,14 +46,8 @@ func (e *Episode) Download(showDir string) error {
 		return err
 	}
 
-	Debug("Raw episode title:", e.Title)
-	e.Title = Sanitize(e.Title)
-	Debug("Sanitized episode title:", e.Title)
-
-	title := e.Title
-	e.Title += mimeToExt(e.Enclosure.Type)
+	e.Title = Sanitize(e.Title) + mimeToExt(e.Enclosure.Type)
 	filename := filepath.Join(showDir, e.Title)
-	Debug("Downloading", title, "to", filename)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -120,7 +114,8 @@ func (e *Episode) Write(p []byte) (int, error) {
 	}
 
 	// If we're here, then all metadata has been successfully written. We can resume with writing the file data now.
-	return e.w.Write(p[consumed:])
+	n, err := e.w.Write(p[consumed:])
+	return consumed + n, err
 }
 
 // SetShowTitle sets the title of the episode's show.
@@ -162,12 +157,12 @@ func (e *Episode) addFrames() {
 	}
 
 	// We always want the show and episode titles to match the contents of the RSS feed.
-	e.meta.SetFrame("TALB", e.showTitle)
-	e.meta.SetFrame("TIT2", e.Title)
+	e.meta.SetFrame("TALB", []byte(e.showTitle))
+	e.meta.SetFrame("TIT2", []byte(e.Title))
 
 	for _, frame := range frames {
-		if e.meta.GetFrame(frame.frame) == "" {
-			e.meta.SetFrame(frame.frame, frame.value)
+		if e.meta.GetFrame(frame.frame) == nil {
+			e.meta.SetFrame(frame.frame, []byte(frame.value))
 		}
 	}
 
@@ -175,18 +170,18 @@ func (e *Episode) addFrames() {
 		if time, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
 			switch e.meta.Version() {
 			case "3":
-				if e.meta.GetFrame("TYER") == "" {
-					e.meta.SetFrame("TYER", time.Format("2006")) // YYYY
+				if e.meta.GetFrame("TYER") == nil {
+					e.meta.SetFrame("TYER", []byte(time.Format("2006"))) // YYYY
 				}
-				if e.meta.GetFrame("TDAT") == "" {
-					e.meta.SetFrame("TDAT", time.Format("0201")) // DDMM
+				if e.meta.GetFrame("TDAT") == nil {
+					e.meta.SetFrame("TDAT", []byte(time.Format("0201"))) // DDMM
 				}
-				if e.meta.GetFrame("TIME") == "" {
-					e.meta.SetFrame("TIME", time.Format("1504")) // HHMM
+				if e.meta.GetFrame("TIME") == nil {
+					e.meta.SetFrame("TIME", []byte(time.Format("1504"))) // HHMM
 				}
 			case "4":
-				if e.meta.GetFrame("TDRC") == "" {
-					e.meta.SetFrame("TDRC", time.Format("20060102T150405")) // YYYYMMDDTHHMMSS
+				if e.meta.GetFrame("TDRC") == nil {
+					e.meta.SetFrame("TDRC", []byte(time.Format("20060102T150405"))) // YYYYMMDDTHHMMSS
 				}
 			}
 		}
