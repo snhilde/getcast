@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"path/filepath"
 	"os"
+	"strings"
 	"strconv"
 )
 
@@ -19,65 +20,62 @@ type Show struct {
 	Dir        string  // show's directory on disk
 	Title      string  `xml:"channel>title"`
 	Author     string  `xml:"channel>author"`
-	Image      string  `xml:"channel>image"`
+	Image      string  `xml:"channel>image"` // TODO: image/url?
 	Episodes []Episode `xml:"channel>item"`
 }
 
 
 // Sync gets the current list of available episodes, determines which of them need to be downloaded, and then gets them.
-func (s *Show) Sync(mainDir string) int {
+func (s *Show) Sync(mainDir string) (int, error) {
 	resp, err := http.Get(s.URL.String())
 	if err != nil {
-		fmt.Println("Invalid RSS feed:", err)
-		return 0
+		return 0, fmt.Errorf("Invalid RSS feed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading RSS feed:", err)
-		return 0
+		return 0, fmt.Errorf("Error reading RSS feed: %v", err)
 	}
 
 	if err := xml.Unmarshal(data, s); err != nil {
-		fmt.Println("Error reading RSS feed:", err)
-		return 0
+		return 0, fmt.Errorf("Error reading RSS feed: %v", err)
+	}
+	if s.Title == "" {
+		return 0, fmt.Errorf("Error parsing RSS feed: No show information found")
+	} else if len(s.Episodes) == 0 {
+		return 0, fmt.Errorf("Error parsing RSS feed: No episodes found")
 	}
 
 	// Make sure we can create directories and files with the names found.
 	s.Title = Sanitize(s.Title)
-	for i, episode := range s.Episodes {
+	for _, episode := range s.Episodes {
 		episode.SetShowTitle(s.Title)
 		episode.SetShowArtist(s.Author)
-		s.Episodes[i].Title = Sanitize(episode.Title) + mimeToExt(episode.Type)
 	}
 
 	// Validate (or create) this show's directory.
 	s.Dir = filepath.Join(mainDir, s.Title)
 	if err := ValidateDir(s.Dir); err != nil {
-		fmt.Println("Invalid show directory:", err)
-		return 0
+		return 0, fmt.Errorf("Invalid show directory: %v", err)
 	}
 
 	// Choose which episodes we want to download.
 	if err := s.filter(); err != nil {
-		fmt.Println("Error selecting episodes:", err)
-		return 0
+		return 0, fmt.Errorf("Error selecting episodes: %v", err)
 	}
 
 	if len(s.Episodes) == 0 {
-		fmt.Println("No new episodes")
-		return 0
+		return 0, fmt.Errorf("No new episodes")
 	}
 
 	for i, episode := range s.Episodes {
 		if err := episode.Download(s.Dir); err != nil {
-			fmt.Println("Error downloading episode:", err)
-			return i
+			return i, fmt.Errorf("Error downloading episode:", err)
 		}
 	}
 
-	return len(s.Episodes)
+	return len(s.Episodes), nil
 }
 
 // filter filters out the episodes we don't want to download.
@@ -94,13 +92,14 @@ func (s *Show) filter() error {
 			return err
 		}
 
-		// We only want the audio files.
 		filename := info.Name()
-		if !isAudio(filename) {
+		if strings.HasPrefix(filename, ".") {
+			return nil
+		} else if !isAudio(filename) {
 			return nil
 		}
 
-		file, err := os.Open(filepath.Join(path, filename))
+		file, err := os.Open(path)
 		if err != nil {
 			return err
 		}
@@ -113,13 +112,13 @@ func (s *Show) filter() error {
 		}
 
 		// We only want episodes from this show.
-		if value := meta.GetFrame("TALB"); value != s.Title {
+		if value := meta.GetFrame("TALB"); string(value) != s.Title {
 			return nil
 		}
 
 		season := 0
-		if value := meta.GetFrame("TPOS"); value != "" {
-			if num, err := strconv.Atoi(value); err == nil {
+		if value := meta.GetFrame("TPOS"); value != nil {
+			if num, err := strconv.Atoi(string(value)); err == nil {
 				season = num
 				if season > latestSeason {
 					latestSeason = season
@@ -128,8 +127,8 @@ func (s *Show) filter() error {
 		}
 
 		episode := 0
-		if value := meta.GetFrame("TRCK"); value != "" {
-			if num, err := strconv.Atoi(value); err == nil {
+		if value := meta.GetFrame("TRCK"); value != nil {
+			if num, err := strconv.Atoi(string(value)); err == nil {
 				episode = num
 				if season == latestSeason && episode > latestEpisode {
 					latestEpisode = episode
@@ -175,29 +174,6 @@ func (s *Show) filter() error {
 	return nil
 }
 
-
-// mimeToExt finds the appropriate file extension based on the MIME type.
-func mimeToExt(mime string) string {
-	switch mime {
-	case "audio/aac":
-		return ".aac"
-	case "audio/midi", "audio/x-midi":
-		return ".midi"
-	case "audio/mpeg", "audio/mp3":
-		return ".mp3"
-	case "audio/ogg":
-		return ".oga"
-	case "audio/opus":
-		return ".opus"
-	case "audio/wav":
-		return ".wav"
-	case "audio/webm":
-		return ".weba"
-	}
-
-	// If we can't match a specific type, we'll default to mp3.
-	return ".mp3"
-}
 
 // isAudio determines if the provided file is an audio file or not.
 func isAudio(filename string) bool {

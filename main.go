@@ -20,6 +20,7 @@ func main() {
 
 	if (*debugFlag) {
 		DebugMode = true
+		Debug("Debug mode enabled")
 	}
 
 	// Validate (or create) the download directory.
@@ -53,8 +54,12 @@ func main() {
 	// And sync them.
 	total := 0
 	for _, show := range shows {
-		fmt.Println("Syncing with", show.URL)
-		total += show.Sync(*downDir)
+		fmt.Println("Syncing", show.URL)
+		n, err := show.Sync(*downDir)
+		if err != nil {
+			fmt.Println(err)
+		}
+		total += n
 	}
 
 	fmt.Println("Synced", total, "episodes")
