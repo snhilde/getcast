@@ -47,13 +47,13 @@ func (s *Show) Sync(mainDir string) (int, error) {
 		return 0, fmt.Errorf("Error parsing RSS feed: No episodes found")
 	}
 
-	// Make sure we can create directories and files with the names found.
+	// Make sure we can create directories and files with the names that were parsed earlier from the RSS feed.
 	s.Title = SanitizeTitle(s.Title)
 	Debug("Setting show title to", s.Title)
 	Debug("Setting show artist to", s.Author)
-	for _, episode := range s.Episodes {
-		episode.SetShowTitle(s.Title)
-		episode.SetShowArtist(s.Author)
+	for i := range s.Episodes {
+		s.Episodes[i].SetShowTitle(s.Title)
+		s.Episodes[i].SetShowArtist(s.Author)
 	}
 
 	// Validate (or create) this show's directory.
@@ -71,6 +71,7 @@ func (s *Show) Sync(mainDir string) (int, error) {
 		return 0, fmt.Errorf("No new episodes")
 	}
 
+	Debug("Downloading", len(s.Episodes), "episodes")
 	for i, episode := range s.Episodes {
 		if err := episode.Download(s.Dir); err != nil {
 			return i, fmt.Errorf("Error downloading episode:", err)
@@ -115,6 +116,7 @@ func (s *Show) filter() error {
 
 		// We only want episodes from this show.
 		if value := meta.GetFrame("TALB"); string(value) != s.Title {
+			Debug("Episode is from a different show:", string(value))
 			return nil
 		}
 
@@ -142,6 +144,7 @@ func (s *Show) filter() error {
 
 		return nil
 	}
+	Debug("Looking for most current episode already synced")
 	if err := filepath.Walk(s.Dir, walkFunc); err != nil {
 		return err
 	}
@@ -149,6 +152,11 @@ func (s *Show) filter() error {
 	want := []Episode{}
 	if latestEpisode > 0 {
 		// Filter out any episodes that are older than the most recent one.
+		if latestSeason > 0 {
+			Debug("Latest episode found is episode", latestEpisode, "of season", latestSeason)
+		} else {
+			Debug("Latest episode found is episode", latestEpisode)
+		}
 		for _, episode := range s.Episodes {
 			season, _ := strconv.Atoi(episode.Season)
 			number, _ := strconv.Atoi(episode.Number)
@@ -158,6 +166,7 @@ func (s *Show) filter() error {
 		}
 	} else {
 		// We weren't able to determine the latest episode. We'll grab everything we don't already have.
+		Debug("Could not determine latest episode, syncing everything")
 		for _, episode := range s.Episodes {
 			if _, ok := have[episode.Title]; !ok {
 				want = append(want, episode)

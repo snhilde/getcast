@@ -124,10 +124,12 @@ func (m *Meta) GetFrame(frame string) []byte {
 	// If we haven't cached the frames yet, do so now.
 	if m.frames == nil {
 		if err := m.parseFrames(); err != nil {
+			Debug("Failed to parse frames:", err)
 			return nil
 		}
 		if m.frames == nil {
-			m.frames = make(map[string]byte)
+			Debug("Didn't find any frames")
+			m.frames = make(map[string][]byte)
 		}
 	}
 
@@ -143,10 +145,12 @@ func (m *Meta) SetFrame(frame string, value []byte) {
 	// If we haven't cached the frames yet, do so now.
 	if m.frames == nil {
 		if err := m.parseFrames(); err != nil {
+			Debug("Failed to parse frames:", err)
 			return
 		}
 		if m.frames == nil {
-			m.frames = make(map[string]byte)
+			Debug("Didn't find any frames")
+			m.frames = make(map[string][]byte)
 		}
 	}
 
@@ -167,7 +171,7 @@ func (m *Meta) Build() []byte {
 	// Build out the frames first so we know how long the metadata is.
 	frames := m.buildFrames()
 	if frames == nil {
-		Debug("No metadata to build")
+		Debug("No track information exists")
 		return nil
 	}
 
@@ -200,6 +204,50 @@ func (m *Meta) Build() []byte {
 	return metadata.Bytes()
 }
 
+
+// buildFrames builds only the frames of the episode's metadata from the internal dictionary of id/value pairs.
+func (m *Meta) buildFrames() []byte {
+	if m == nil || !m.Buffered() {
+		return nil
+	}
+	Debug("Building metadata frames")
+
+	if m.frames == nil {
+		if err := m.parseFrames(); err != nil {
+			Debug("Failed to parse existing frames")
+			return nil
+		}
+	}
+
+	if len(m.frames) == 0 {
+		Debug("No frames to build")
+		return nil
+	}
+
+	buf := new(bytes.Buffer)
+	for id, value := range m.frames {
+		if len(id) != 4 {
+			continue
+		}
+
+		// Write ID.
+		buf.WriteString(strings.ToUpper(id))
+
+		// Write length. (+2 for encoding bytes around value.)
+		length := writeLen(len(value) + 2)
+		buf.Write(length)
+
+		// Write flags.
+		buf.Write([]byte{0x00, 0x00})
+
+		// Write value. (0x03 header with 0x00 footer indicates that the value is UTF-8. We store everything as UTF-8)
+		buf.WriteByte(0x03)
+		buf.Write(value)
+		buf.WriteByte(0x00)
+	}
+
+	return buf.Bytes()
+}
 
 // parseFrames creates the internal dictionary of all frames (represented as id/value pairs) in the metadata. If no
 // metadata is present or metadata is present but no frames exist, this will create an empty, non-nil dictionary.
@@ -240,29 +288,38 @@ func (m *Meta) parseFrames() error {
 	for buf.Len() > 0 {
 		// Read frame ID. The ID must be uppercase letters or numbers.
 		id := buf.Next(4)
+		valid := true
 		for _, char := range id {
 			if char < '0' || char > 'Z' || (char > '9' && char < 'A') {
-				return fmt.Errorf("Invalid frame ID")
+				valid = false
+				break
 			}
+		}
+		if !valid {
+			Debug("Stopping frame parse early: Invalid frame ID")
+			break
 		}
 
 		size := readNum(buf.Next(4))
 		if size <= 0 {
-			return fmt.Errorf("Invalid length for %v: %v", string(id), size)
+			Debug("Stopping frame parse early: Invalid length for", string(id), "-", size)
+			break
 		}
 
 		flags := buf.Next(2)
 		if len(flags) != 2 {
-			return fmt.Errorf("Error reading frame flags")
+			Debug("Stopping frame parse early: Error reading frame flags")
+			break
 		}
 
 		value := buf.Next(size)
 		if len(value) != size {
-			return fmt.Errorf("Error reading frame value")
+			Debug("Stopping frame parse early: Error reading frame value")
+			break
 		}
 
 		// We only want the frame if these flags are not set.
-		if flags[1] & 0x0C == 0 {
+		if flags[1] & 0x0C > 0 {
 			continue
 		}
 
@@ -285,51 +342,11 @@ func (m *Meta) parseFrames() error {
 			value = value[1:len(value)-1]
 		}
 
+		Debug("Found", string(id), "-", string(value))
 		m.frames[string(id)] = value
 	}
 
 	return nil
-}
-
-// buildFrames builds only the frames of the episode's metadata from the internal dictionary of id/value pairs.
-func (m *Meta) buildFrames() []byte {
-	if m == nil || !m.Buffered() {
-		return nil
-	}
-
-	if m.frames == nil {
-		if err := m.parseFrames(); err != nil {
-			return nil
-		}
-	}
-
-	if len(m.frames) == 0 {
-		return nil
-	}
-
-	buf := new(bytes.Buffer)
-	for id, value := range m.frames {
-		if len(id) != 4 {
-			continue
-		}
-
-		// Write ID.
-		buf.WriteString(strings.ToUpper(id))
-
-		// Write length. (+2 for encoding bytes around value.)
-		length := writeLen(len(value) + 2)
-		buf.Write(length)
-
-		// Write flags.
-		buf.Write([]byte{0x00, 0x00})
-
-		// Write value. (0x03 header with 0x00 footer indicates that the value is UTF-8. We store everything as UTF-8)
-		buf.WriteByte(0x03)
-		buf.Write(value)
-		buf.WriteByte(0x00)
-	}
-
-	return buf.Bytes()
 }
 
 // length returns the reported length in bytes of the entire metadata, or -1 if the metadata could not be successfully

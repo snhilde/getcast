@@ -38,6 +38,8 @@ type Episode  struct {
 // Internet -> http object -> Episode object -> Disk
 //             \-> Progress Bar object   \-> Meta object
 func (e *Episode) Download(showDir string) error {
+	Debug("\n--- Downloading episode ---")
+
 	if showDir == "" {
 		return fmt.Errorf("Missing download directory")
 	}
@@ -77,11 +79,11 @@ func (e *Episode) Download(showDir string) error {
 	if err != nil {
 		return err
 	}
-	Debug("Episode downloaded")
 
 	// Because we've been mucking around with carriage returns, we need to manually move down a row.
 	fmt.Println()
 
+	Debug("--- Episode downloaded ---")
 	return nil
 }
 
