@@ -52,8 +52,10 @@ func main() {
 
 	// And sync them.
 	total := 0
-	for _, v := range shows {
-		total += v.Sync(*downDir)
+	for _, show := range shows {
+		fmt.Println("Syncing with", show.URL)
+		total += show.Sync(*downDir)
 	}
+
 	fmt.Println("Synced", total, "episodes")
 }

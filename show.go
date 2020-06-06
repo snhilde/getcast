@@ -44,24 +44,22 @@ func (s *Show) Sync(mainDir string) int {
 		return 0
 	}
 
+	// Make sure we can create directories and files with the names found.
 	s.Title = Sanitize(s.Title)
-	if s.Title == "" {
-		fmt.Println("Error parsing RSS feed: No show title found")
-		return 0
+	for i, episode := range s.Episodes {
+		episode.SetShowTitle(s.Title)
+		episode.SetShowArtist(s.Author)
+		s.Episodes[i].Title = Sanitize(episode.Title) + mimeToExt(episode.Type)
 	}
 
-	for i, e := range s.Episodes {
-		e.SetShowTitle(s.Title)
-		e.SetShowArtist(s.Author)
-		s.Episodes[i].Title = Sanitize(e.Title) + mimeToExt(e.Type)
-	}
-
+	// Validate (or create) this show's directory.
 	s.Dir = filepath.Join(mainDir, s.Title)
 	if err := ValidateDir(s.Dir); err != nil {
 		fmt.Println("Invalid show directory:", err)
 		return 0
 	}
 
+	// Choose which episodes we want to download.
 	if err := s.filter(); err != nil {
 		fmt.Println("Error selecting episodes:", err)
 		return 0
@@ -72,10 +70,8 @@ func (s *Show) Sync(mainDir string) int {
 		return 0
 	}
 
-	for i, e := range s.Episodes {
-		e.SetShowTitle(s.Title)
-		e.SetShowArtist(s.Author)
-		if err := e.Download(s.Dir); err != nil {
+	for i, episode := range s.Episodes {
+		if err := episode.Download(s.Dir); err != nil {
 			fmt.Println("Error downloading episode:", err)
 			return i
 		}
@@ -90,11 +86,15 @@ func (s *Show) filter() error {
 	latestSeason := 0
 	latestEpisode := 0
 
+	// We're going to use this function to inspect all the episodes we currently have in the show's directory. We'll
+	// compare every episode of this show to determine what the most recent episode is and then download only the
+	// episodes that are newer than that.
 	walkFunc := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
+		// We only want the audio files.
 		filename := info.Name()
 		if !isAudio(filename) {
 			return nil
@@ -106,9 +106,15 @@ func (s *Show) filter() error {
 		}
 		defer file.Close()
 
+		// Build the metadata object so we can inspect the tag contents.
 		meta := NewMeta(nil)
 		if _, err := io.Copy(meta, file); err != nil && err != io.ErrShortWrite {
 			return err
+		}
+
+		// We only want episodes from this show.
+		if value := meta.GetFrame("TALB"); value != s.Title {
+			return nil
 		}
 
 		season := 0
@@ -125,7 +131,7 @@ func (s *Show) filter() error {
 		if value := meta.GetFrame("TRCK"); value != "" {
 			if num, err := strconv.Atoi(value); err == nil {
 				episode = num
-				if episode > latestEpisode && season == latestSeason {
+				if season == latestSeason && episode > latestEpisode {
 					latestEpisode = episode
 				}
 			}
@@ -141,6 +147,7 @@ func (s *Show) filter() error {
 
 	want := []Episode{}
 	if latestEpisode > 0 {
+		// Filter out any episodes that are older than the most recent one.
 		for _, episode := range s.Episodes {
 			season, _ := strconv.Atoi(episode.Season)
 			number, _ := strconv.Atoi(episode.Number)
