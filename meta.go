@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"strconv"
 	"golang.org/x/text/encoding/unicode"
 	"unsafe"
 )
@@ -125,6 +126,9 @@ func (m *Meta) GetFrame(frame string) []byte {
 		if err := m.parseFrames(); err != nil {
 			return nil
 		}
+		if m.frames == nil {
+			m.frames = make(map[string]byte)
+		}
 	}
 
 	return m.frames[frame]
@@ -141,10 +145,15 @@ func (m *Meta) SetFrame(frame string, value []byte) {
 		if err := m.parseFrames(); err != nil {
 			return
 		}
+		if m.frames == nil {
+			m.frames = make(map[string]byte)
+		}
 	}
 
 	if len(frame) == 4 {
-		m.frames[strings.ToUpper(frame)] = value
+		frame = strings.ToUpper(frame)
+		m.frames[frame] = value
+		Debug("Set frame", frame, "to", string(value))
 	}
 }
 
@@ -153,10 +162,12 @@ func (m *Meta) Build() []byte {
 	if m == nil {
 		return nil
 	}
+	Debug("Building metadata")
 
 	// Build out the frames first so we know how long the metadata is.
 	frames := m.buildFrames()
 	if frames == nil {
+		Debug("No metadata to build")
 		return nil
 	}
 
@@ -166,7 +177,12 @@ func (m *Meta) Build() []byte {
 	metadata.WriteString("ID3")
 
 	// Write major version.
-	metadata.WriteByte(m.buffer.Bytes()[3])
+	version := m.Version()
+	if version == "" {
+		version = "4"
+	}
+	v, _ := strconv.Atoi(version)
+	metadata.WriteByte(byte(v))
 
 	// Write minor version.
 	metadata.WriteByte(0x00)
@@ -175,7 +191,7 @@ func (m *Meta) Build() []byte {
 	metadata.WriteByte(0x00)
 
 	// Write length.
-	length := writeLen(int32(len(frames)))
+	length := writeLen(len(frames))
 	metadata.Write(length)
 
 	// Write frames.
@@ -190,11 +206,9 @@ func (m *Meta) Build() []byte {
 func (m *Meta) parseFrames() error {
 	if !m.Buffered() {
 		return fmt.Errorf("Missing metadata to parse")
-	} else if m.frames != nil {
+	} else if m.noMeta {
 		return nil
-	}
-
-	if m.noMeta {
+	} else if m.frames != nil {
 		return nil
 	}
 
@@ -289,6 +303,10 @@ func (m *Meta) buildFrames() []byte {
 		}
 	}
 
+	if len(m.frames) == 0 {
+		return nil
+	}
+
 	buf := new(bytes.Buffer)
 	for id, value := range m.frames {
 		if len(id) != 4 {
@@ -299,7 +317,7 @@ func (m *Meta) buildFrames() []byte {
 		buf.WriteString(strings.ToUpper(id))
 
 		// Write length. (+2 for encoding bytes around value.)
-		length := writeLen(int32(len(value) + 2))
+		length := writeLen(len(value) + 2)
 		buf.Write(length)
 
 		// Write flags.
@@ -376,10 +394,9 @@ func readNum(buf []byte) int {
 	return num
 }
 
-// writeLen converts the 32-bit integer into a byte slice, big-endian.
-func writeLen(n int32) []byte {
+// writeLen converts the integer into a byte slice, big-endian.
+func writeLen(n int) []byte {
 	buf := new(bytes.Buffer)
-
 	for i := 0; i < 4; i++ {
 		tmp := n
 		tmp >>= (3 - i) * 8

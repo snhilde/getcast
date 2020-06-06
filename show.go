@@ -48,7 +48,9 @@ func (s *Show) Sync(mainDir string) (int, error) {
 	}
 
 	// Make sure we can create directories and files with the names found.
-	s.Title = Sanitize(s.Title)
+	s.Title = SanitizeTitle(s.Title)
+	Debug("Setting show title to", s.Title)
+	Debug("Setting show artist to", s.Author)
 	for _, episode := range s.Episodes {
 		episode.SetShowTitle(s.Title)
 		episode.SetShowArtist(s.Author)

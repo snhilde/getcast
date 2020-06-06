@@ -37,6 +37,11 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+	word := "show"
+	if len(urls) > 1 {
+		word = "shows"
+	}
+	fmt.Println("Beginning sync process for", len(urls), word)
 
 	// Collect together the shows that we want to sync.
 	shows := make([]Show, len(urls))

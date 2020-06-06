@@ -39,15 +39,15 @@ type Episode  struct {
 //             \-> Progress Bar object   \-> Meta object
 func (e *Episode) Download(showDir string) error {
 	if showDir == "" {
-		return fmt.Errorf("Invalid call")
+		return fmt.Errorf("Missing download directory")
 	}
 
 	if err := e.validateData(); err != nil {
 		return err
 	}
 
-	e.Title = Sanitize(e.Title) + mimeToExt(e.Enclosure.Type)
 	filename := filepath.Join(showDir, e.Title)
+	Debug("Saving episode to", filename)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -72,10 +72,12 @@ func (e *Episode) Download(showDir string) error {
 	e.meta = NewMeta(nil)
 	e.w = file
 
+	Debug("Beginning download process")
 	_, err = io.Copy(e, tee)
 	if err != nil {
 		return err
 	}
+	Debug("Episode downloaded")
 
 	// Because we've been mucking around with carriage returns, we need to manually move down a row.
 	fmt.Println()
@@ -137,6 +139,8 @@ func (e *Episode) SetShowArtist(artist string) {
 // will not be overwritten with data from the RSS feed. The only exceptions to this rule are the show and episode
 // titles, which must match the data from the RSS feed to sync properly.
 func (e *Episode) addFrames() {
+	Debug("Building metadata frames")
+
 	frames := []struct {
 		frame string
 		value string
@@ -194,14 +198,18 @@ func (e *Episode) validateData() error {
 		return fmt.Errorf("Cannot validata data: Bad episode object")
 	}
 
+	Debug("Validating episode title:", e.Title)
 	if e.Title == "" {
 		return fmt.Errorf("Missing episode title")
 	}
+	e.Title = SanitizeTitle(e.Title) + mimeToExt(e.Enclosure.Type)
 
+	Debug("Validating episode link:", e.Enclosure.URL)
 	if e.Enclosure.URL == "" {
 		return fmt.Errorf("Missing download link for %v", e.Title)
 	}
 
+	Debug("Validating episode number:", e.Number)
 	if e.Number == "" {
 		Debug("No episode number found for", e.Title)
 	}
@@ -212,23 +220,27 @@ func (e *Episode) validateData() error {
 
 // mimeToExt finds the appropriate file extension based on the MIME type.
 func mimeToExt(mime string) string {
+	var ext string
 	switch mime {
 	case "audio/aac":
-		return ".aac"
+		ext = ".aac"
 	case "audio/midi", "audio/x-midi":
-		return ".midi"
+		ext = ".midi"
 	case "audio/mpeg", "audio/mp3":
-		return ".mp3"
+		ext = ".mp3"
 	case "audio/ogg":
-		return ".oga"
+		ext = ".oga"
 	case "audio/opus":
-		return ".opus"
+		ext = ".opus"
 	case "audio/wav":
-		return ".wav"
+		ext = ".wav"
 	case "audio/webm":
-		return ".weba"
+		ext = ".weba"
+	default:
+		// If we can't match a specific type, we'll default to mp3.
+		ext = ".mp3"
 	}
 
-	// If we can't match a specific type, we'll default to mp3.
-	return ".mp3"
+	Debug("Mapping MIME type", mime, "to extension", ext)
+	return ext
 }

@@ -36,13 +36,21 @@ func Reduce(n int) string {
 	return strconv.Itoa(n) + units[index]
 }
 
-// Sanitize replaces any characters in the provided string that cannot be used in a directory/file name with "_".
-func Sanitize(name string) string {
+// SanitizeTitle replaces any characters in the provided string that cannot be used in a directory/file name with "_".
+func SanitizeTitle(name string) string {
+	orig := name
+
 	illegalChars := []string{"*", "\"", "?", "/", "\\", "<", ">", ":", "|"}
 	for _, char := range illegalChars {
 		name = strings.ReplaceAll(name, char, "_")
 	}
 
+	if name == orig {
+		Debug("Title is safe")
+	} else {
+		Debug("Raw name:", name)
+		Debug("Sanitized:", name)
+	}
 	return name
 }
 
@@ -59,6 +67,7 @@ func ValidateDir(path string) error {
 	if err != nil {
 		// We'll assume the error is because the directory does not exist. We'll try to create it here and let other
 		// possible errors flow from that.
+		Debug("Creating", path)
 		return os.MkdirAll(path, 0755)
 	}
 
@@ -97,5 +106,6 @@ func ValidateDir(path string) error {
 		}
 	}
 
+	Debug("Directory has read and write permissions")
 	return nil
 }
