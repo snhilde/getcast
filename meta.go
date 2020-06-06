@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"golang.org/x/text/encoding/unicode"
+	"unsafe"
 )
 
 
@@ -13,7 +14,7 @@ type Meta struct {
 	buffer   *bytes.Buffer      // buffer to store filedata between successive Write operations
 	buffered  bool              // whether or not all metadata is present in the buffer
 	noMeta    bool              // whether or not the file has any metadata
-	frames    map[string]string // cached dictionary of frames
+	frames    map[string][]byte // cached dictionary of frames
 }
 
 
@@ -112,17 +113,17 @@ func (m *Meta) Version() string {
 	return fmt.Sprintf("%v", data[3])
 }
 
-// GetFrame returns the value of the specified frame, or "" if no frame exists with that name. The name will be matched
+// GetFrame returns the value of the specified frame, or nil if no frame exists with that name. The name will be matched
 // in a case-sensitive comparison.
-func (m *Meta) GetFrame(frame string) string {
-	if m == nil {
-		return ""
+func (m *Meta) GetFrame(frame string) []byte {
+	if m == nil || !m.Buffered() {
+		return nil
 	}
 
 	// If we haven't cached the frames yet, do so now.
 	if m.frames == nil {
 		if err := m.parseFrames(); err != nil {
-			return ""
+			return nil
 		}
 	}
 
@@ -130,8 +131,8 @@ func (m *Meta) GetFrame(frame string) string {
 }
 
 // SetFrame sets the frame with the value. Value should be UTF-8 encoded.
-func (m *Meta) SetFrame(frame, value string) {
-	if m == nil {
+func (m *Meta) SetFrame(frame string, value []byte) {
+	if m == nil || !m.Buffered() {
 		return
 	}
 
@@ -193,8 +194,6 @@ func (m *Meta) parseFrames() error {
 		return nil
 	}
 
-	m.frames = make(map[string]string)
-
 	if m.noMeta {
 		return nil
 	}
@@ -217,39 +216,62 @@ func (m *Meta) parseFrames() error {
 
 	// Skip past the extended header, if present.
 	if flags & (1 << 6) > 0 {
-		length := readLen(buf, 4)
+		length := readNum(buf.Next(4))
 		buf.Next(length - 4)
 	}
 
+	// If we encounter any error while reading the metadata, we have to bail out with what we've got because we dont'
+	// know how to continue parsing the rest of the frames. A good area for future development would be to enhance this.
+	m.frames = make(map[string][]byte)
 	for buf.Len() > 0 {
+		// Read frame ID. The ID must be uppercase letters or numbers.
 		id := buf.Next(4)
-		size := readLen(buf, 4)
+		for _, char := range id {
+			if char < '0' || char > 'Z' || (char > '9' && char < 'A') {
+				return fmt.Errorf("Invalid frame ID")
+			}
+		}
+
+		size := readNum(buf.Next(4))
+		if size <= 0 {
+			return fmt.Errorf("Invalid length for %v: %v", string(id), size)
+		}
+
 		flags := buf.Next(2)
+		if len(flags) != 2 {
+			return fmt.Errorf("Error reading frame flags")
+		}
+
 		value := buf.Next(size)
+		if len(value) != size {
+			return fmt.Errorf("Error reading frame value")
+		}
 
 		// We only want the frame if these flags are not set.
 		if flags[1] & 0x0C == 0 {
-			switch value[0] {
-			case 0x00:
-				// ASCII characters. Remove the first and last bytes.
-				value = value[1:len(value)-1]
-			case 0x01:
-				// UTF-16 with BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
-				value = value[1:len(value)-2]
-				decoder := unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder()
-				value, _ = decoder.Bytes(value)
-			case 0x02:
-				// UTF-16 Big Endian without BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
-				value = value[1:len(value)-2]
-				decoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
-				value, _ = decoder.Bytes(value)
-			case 0x03:
-				// UTF-8 (Unicode). Remove the first and last bytes.
-				value = value[1:len(value)-1]
-			}
-
-			m.frames[string(id)] = string(value)
+			continue
 		}
+
+		switch value[0] {
+		case 0x00:
+			// ASCII characters. Remove the first and last bytes.
+			value = value[1:len(value)-1]
+		case 0x01:
+			// UTF-16 with BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
+			value = value[1:len(value)-2]
+			decoder := unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder()
+			value, _ = decoder.Bytes(value)
+		case 0x02:
+			// UTF-16 Big Endian without BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
+			value = value[1:len(value)-2]
+			decoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
+			value, _ = decoder.Bytes(value)
+		case 0x03:
+			// UTF-8 (Unicode). Remove the first and last bytes.
+			value = value[1:len(value)-1]
+		}
+
+		m.frames[string(id)] = value
 	}
 
 	return nil
@@ -283,9 +305,9 @@ func (m *Meta) buildFrames() []byte {
 		// Write flags.
 		buf.Write([]byte{0x00, 0x00})
 
-		// Write value. (0x03 header with 0x00 footer indicates that the value is UTF-8.)
+		// Write value. (0x03 header with 0x00 footer indicates that the value is UTF-8. We store everything as UTF-8)
 		buf.WriteByte(0x03)
-		buf.WriteString(value)
+		buf.Write(value)
 		buf.WriteByte(0x00)
 	}
 
@@ -328,7 +350,7 @@ func (m *Meta) length() int {
 	}
 
 	// Read metadata length.
-	length := readLen(buf, 4)
+	length := readNum(buf.Next(4))
 	if length < 0 {
 		return -1
 	}
@@ -338,25 +360,20 @@ func (m *Meta) length() int {
 }
 
 
-// readLen reads a big-endian number of num bytes from the buffer. This will advance the buffer. If num bytes are not
-// available, this will return -1.
-func readLen(buf *bytes.Buffer, num int) int {
-	if buf == nil || num < 0 || buf.Len() < num {
+// readNum reads a big-endian number out of the bytes. If the number of bytes is greater than the memory size of int,
+// this will return -1.
+func readNum(buf []byte) int {
+	num := int(0)
+	if len(buf) > int(unsafe.Sizeof(num)) {
 		return -1
 	}
 
-	bytes := buf.Next(num)
-	if len(bytes) != num {
-		return -1
+	for _, b := range buf {
+		num <<= 8
+		num |= int(b)
 	}
 
-	length := int(0)
-	for _, v := range bytes {
-		length <<= 8
-		length |= int(v)
-	}
-
-	return length
+	return num
 }
 
 // writeLen converts the 32-bit integer into a byte slice, big-endian.
