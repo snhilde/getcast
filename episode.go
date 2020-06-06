@@ -33,8 +33,8 @@ type Episode  struct {
 
 
 // Download downloads the episode. The bytes will stream through this path from web to disk:
-// Internet -> http object -> Meta object -> Episode object -> Disk
-//                 \-> Progress Bar object
+// Internet -> http object -> Episode object -> Disk
+//             \-> Progress Bar object   \-> Meta object
 func (e *Episode) Download(showDir string) error {
 	if showDir == "" {
 		return fmt.Errorf("Invalid call")
@@ -127,19 +127,18 @@ func (e *Episode) SetShowArtist(artist string) {
 
 
 // addFrames fleshes out the metadata with information from the episode. If a frame already exists in the metadata, it
-// will not be overwritten with data from the RSS feed.
+// will not be overwritten with data from the RSS feed. The only exceptions to this rule are the show and episode
+// titles, which must match the data from the RSS feed to sync properly.
 func (e *Episode) addFrames() {
 	frames := []struct {
 		frame string
 		value string
 	}{
 		// Show information
-		{ "TALB", e.showTitle  },
 		{ "TPE1", e.showArtist }, // Artist
 		{ "TPE2", e.showArtist }, // Album Artist
 
 		// Episode information
-		{ "TIT2", e.Title      },
 		{ "TRCK", e.Number     },
 		{ "TDES", e.Desc       },
 		{ "TPOS", e.Season     },
@@ -149,6 +148,10 @@ func (e *Episode) addFrames() {
 		{ "TCON", "Podcast"    },
 		{ "PCST", "1"          },
 	}
+
+	// We always want the show and episode titles to match the contents of the RSS feed.
+	e.meta.SetFrame("TALB", e.showTitle)
+	e.meta.SetFrame("TIT2", e.Title)
 
 	for _, frame := range frames {
 		if e.meta.GetFrame(frame.frame) == "" {
