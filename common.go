@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"math"
 	"strconv"
-	"strings"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -14,8 +14,12 @@ import (
 // Debug prints additional process information if debug mode is enabled.
 func Debug(a ...interface{}) {
 	if DebugMode {
-		a = append([]interface{}{"(DEBUG)"}, a...)
-		fmt.Println(a...)
+		out := fmt.Sprintln(a...)
+		out = strings.TrimSuffix(out, "\n")
+		lines := strings.Split(out, "\n")
+		for _, line := range lines {
+			fmt.Println("(DEBUG)", line)
+		}
 	}
 }
 
