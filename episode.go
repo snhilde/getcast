@@ -17,14 +17,16 @@ type Episode  struct {
 	showArtist  string
 
 	// Episode information
-	Title       string    `xml:">title"`
-	Season      string    `xml:">season"`
-	Number      string    `xml:">episode"`
-	Desc        string    `xml:">description"`
-	Date        string    `xml:">pubDate"`
-	URL         string    `xml:">enclosure,url"`
-	Size        string    `xml:">enclosure,length"` // TODO: currently unused
-	Type        string    `xml:">enclosure,type"`
+	Title       string    `xml:"title"`
+	Season      string    `xml:"season"`
+	Number      string    `xml:"episode"`
+	Desc        string    `xml:"description"`
+	Date        string    `xml:"pubDate"`
+	Enclosure   struct {
+		URL         string    `xml:"url,attr"`
+		Size        string    `xml:"length,attr"` // TODO: currently unused
+		Type        string    `xml:"type,attr"`
+	} `xml:"enclosure"`
 
 	// Objects to handle reading/writing
 	meta       *Meta      // Metadata object
@@ -40,8 +42,18 @@ func (e *Episode) Download(showDir string) error {
 		return fmt.Errorf("Invalid call")
 	}
 
+	if err := e.validateData(); err != nil {
+		return err
+	}
+
+	Debug("Raw episode title:", e.Title)
+	e.Title = Sanitize(e.Title)
+	Debug("Sanitized episode title:", e.Title)
+
+	title := e.Title
+	e.Title += mimeToExt(e.Enclosure.Type)
 	filename := filepath.Join(showDir, e.Title)
-	fmt.Println(filename)
+	Debug("Downloading", title, "to", filename)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -49,7 +61,7 @@ func (e *Episode) Download(showDir string) error {
 	}
 	defer file.Close()
 
-	resp, err := http.Get(e.URL)
+	resp, err := http.Get(e.Enclosure.URL)
 	if err != nil {
 		return err
 	}
@@ -135,18 +147,18 @@ func (e *Episode) addFrames() {
 		value string
 	}{
 		// Show information
-		{ "TPE1", e.showArtist }, // Artist
-		{ "TPE2", e.showArtist }, // Album Artist
+		{ "TPE1", e.showArtist    }, // Artist
+		{ "TPE2", e.showArtist    }, // Album Artist
 
 		// Episode information
-		{ "TRCK", e.Number     },
-		{ "TDES", e.Desc       },
-		{ "TPOS", e.Season     },
-		{ "WOAF", e.URL        },
+		{ "TRCK", e.Number        },
+		{ "TDES", e.Desc          },
+		{ "TPOS", e.Season        },
+		{ "WOAF", e.Enclosure.URL },
 
 		// Defaults
-		{ "TCON", "Podcast"    },
-		{ "PCST", "1"          },
+		{ "TCON", "Podcast"       },
+		{ "PCST", "1"             },
 	}
 
 	// We always want the show and episode titles to match the contents of the RSS feed.
@@ -179,4 +191,49 @@ func (e *Episode) addFrames() {
 			}
 		}
 	}
+}
+
+// validateData checks that we have all of the required fields from the RSS feed.
+func (e *Episode) validateData() error {
+	if e == nil {
+		return fmt.Errorf("Cannot validata data: Bad episode object")
+	}
+
+	if e.Title == "" {
+		return fmt.Errorf("Missing episode title")
+	}
+
+	if e.Enclosure.URL == "" {
+		return fmt.Errorf("Missing download link for %v", e.Title)
+	}
+
+	if e.Number == "" {
+		Debug("No episode number found for", e.Title)
+	}
+
+	return nil
+}
+
+
+// mimeToExt finds the appropriate file extension based on the MIME type.
+func mimeToExt(mime string) string {
+	switch mime {
+	case "audio/aac":
+		return ".aac"
+	case "audio/midi", "audio/x-midi":
+		return ".midi"
+	case "audio/mpeg", "audio/mp3":
+		return ".mp3"
+	case "audio/ogg":
+		return ".oga"
+	case "audio/opus":
+		return ".opus"
+	case "audio/wav":
+		return ".wav"
+	case "audio/webm":
+		return ".weba"
+	}
+
+	// If we can't match a specific type, we'll default to mp3.
+	return ".mp3"
 }
