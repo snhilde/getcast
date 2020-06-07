@@ -14,10 +14,10 @@ var (
 
 
 func main() {
-	dirArg := flag.String("d", "", "required, main download directory for all podcasts")
-	urlArg := flag.String("u", "", "required, URL of show's RSS feed")
-	numArg := flag.Int("n", 0, "optional, episode number to download")
 	debugFlag := flag.Bool("debug", false, "enable debug mode")
+	urlArg := flag.String("u", "", "required, URL of show's RSS feed")
+	dirArg := flag.String("d", "", "required, main download directory for all podcasts")
+	numArg := flag.Int("n", 0, "optional, episode number to download")
 	flag.Parse()
 
 	if (*debugFlag) {
@@ -25,7 +25,6 @@ func main() {
 		Debug("Debug mode enabled")
 	}
 
-	// Make sure we were provided a URL.
 	if *urlArg == "" {
 		fmt.Println("No show specified")
 		fmt.Println("Usage:")
@@ -44,6 +43,12 @@ func main() {
 	show := Show{URL: u}
 
 	// Validate (or create) the download directory.
+	if *dirArg == "" {
+		fmt.Println("No download directory specified")
+		fmt.Println("Usage:")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 	if err := ValidateDir(*dirArg); err != nil {
 		fmt.Println(err)
 		fmt.Println("Usage:")
@@ -51,7 +56,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// And sync them.
+	// And sync the show.
 	n, err := show.Sync(*dirArg)
 	if err != nil {
 		fmt.Println(err)
