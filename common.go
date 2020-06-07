@@ -42,7 +42,7 @@ func SanitizeTitle(name string) string {
 
 	illegalChars := []string{"*", "\"", "?", "/", "\\", "<", ">", ":", "|"}
 	for _, char := range illegalChars {
-		name = strings.ReplaceAll(name, char, "_")
+		name = strings.ReplaceAll(name, char, "-")
 	}
 
 	if name == orig {
