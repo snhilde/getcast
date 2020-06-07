@@ -80,9 +80,8 @@ func (e *Episode) Download(showDir string) error {
 	if err != nil {
 		return err
 	}
-	bar.Finish()
 
-	return nil
+	return bar.Finish()
 }
 
 // Write first constructs and then writes the episode's metadata and then passes all remaining data on to the next layer.

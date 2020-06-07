@@ -47,24 +47,26 @@ func (pr *Progress) String() string {
 }
 
 // Finish cleans up the terminal line and prints the overall success of the download operation.
-func (pr *Progress) Finish() {
-	if pr != nil {
-		// Print the final status.
-		fmt.Printf("\r%s", strings.Repeat(" ", 50))
-		fmt.Printf("%v", pr.String())
-
-		// Because we've been mucking around with carriage returns, we need to manually move down a row.
-		fmt.Println()
-
-		if pr.have == pr.total {
-			fmt.Println("Episode successfully downloaded")
-		} else {
-			if pr.have < pr.total {
-				fmt.Println("Failed to download entire episode")
-			} else {
-				fmt.Println("Downloaded more bytes than expected")
-			}
-			Debug("Expected", pr.total, "bytes, Received", pr.have, "bytes")
-		}
+func (pr *Progress) Finish() error {
+	if pr == nil {
+		return fmt.Errorf("Invalid Progress object")
 	}
+
+	// Print the final status.
+	fmt.Printf("\r%s", strings.Repeat(" ", 50))
+	fmt.Printf("%v", pr.String())
+
+	// Because we've been mucking around with carriage returns, we need to manually move down a row.
+	fmt.Println()
+
+	if pr.have != pr.total {
+		Debug("Expected", pr.total, "bytes, Received", pr.have, "bytes")
+		if pr.have < pr.total {
+			return fmt.Errorf("Failed to download entire episode")
+		}
+		return fmt.Errorf("Downloaded more bytes than expected")
+	}
+
+	fmt.Println("Episode successfully downloaded")
+	return nil
 }
