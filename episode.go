@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"os"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -48,7 +49,7 @@ func (e *Episode) Download(showDir string) error {
 		return err
 	}
 
-	filename := filepath.Join(showDir, e.Title)
+	filename := e.buildFilename(showDir)
 	Debug("Saving episode to", filename)
 
 	file, err := os.Create(filename)
@@ -192,6 +193,17 @@ func (e *Episode) addFrames() {
 			}
 		}
 	}
+}
+
+// buildFilename pieces together the different components of the episode into one absolute-path filename.
+func (e *Episode) buildFilename(path string) string {
+	// Let's first check if the title contains the episode number. If it doesn't, then we want to add it so as to
+	// improve the filesystem sorting.
+	if e.Number != "" && !strings.Contains(e.Title, e.Number) {
+		e.Title = e.Number + " - " + e.Title
+	}
+
+	return filepath.Join(path, e.Title)
 }
 
 // validateData checks that we have all of the required fields from the RSS feed.
