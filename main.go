@@ -14,10 +14,10 @@ var (
 
 
 func main() {
-	debugFlag := flag.Bool("debug", false, "enable debug mode")
-	urlArg := flag.String("u", "", "required, URL of show's RSS feed")
-	dirArg := flag.String("d", "", "required, main download directory for all podcasts")
-	numArg := flag.Int("n", 0, "optional, episode number to download")
+	debugFlag := flag.Bool("debug", false, "Enable debug mode")
+	urlArg := flag.String("u", "", "Required, URL of show's RSS feed")
+	dirArg := flag.String("d", "", "Required, Main download directory for all podcasts")
+	numArg := flag.String("n", "", "(Optional) Episode number to download. If podcast also has season, specify the episode like this: seasonNum-episodeNum, e.g. 3-5 to download episode 5 of season 3.")
 	flag.Parse()
 
 	if (*debugFlag) {
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	// And sync the show.
-	n, err := show.Sync(*dirArg)
+	n, err := show.Sync(*dirArg, *numArg)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

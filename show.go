@@ -26,7 +26,7 @@ type Show struct {
 
 
 // Sync gets the current list of available episodes, determines which of them need to be downloaded, and then gets them.
-func (s *Show) Sync(mainDir string) (int, error) {
+func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	resp, err := http.Get(s.URL.String())
 	if err != nil {
 		return 0, fmt.Errorf("Invalid RSS feed: %v", err)
@@ -63,12 +63,16 @@ func (s *Show) Sync(mainDir string) (int, error) {
 	}
 
 	// Choose which episodes we want to download.
-	if err := s.filter(); err != nil {
+	if err := s.filter(specificEp); err != nil {
 		return 0, fmt.Errorf("Error selecting episodes: %v", err)
 	}
 
 	if len(s.Episodes) == 0 {
-		return 0, fmt.Errorf("No new episodes")
+		if specificEp != "" {
+			return 0, fmt.Errorf("Episode %v not found", specificEp)
+		} else {
+			return 0, fmt.Errorf("No new episodes")
+		}
 	}
 
 	Debug("Downloading", len(s.Episodes), "episodes")
@@ -82,7 +86,7 @@ func (s *Show) Sync(mainDir string) (int, error) {
 }
 
 // filter filters out the episodes we don't want to download.
-func (s *Show) filter() error {
+func (s *Show) filter(specificEp string) error {
 	have := make(map[string]int)
 	latestSeason := 0
 	latestEpisode := 0
@@ -144,45 +148,134 @@ func (s *Show) filter() error {
 
 		return nil
 	}
-	Debug("Looking for most current episode already synced")
-	if err := filepath.Walk(s.Dir, walkFunc); err != nil {
-		return err
-	}
 
 	want := []Episode{}
-	if latestEpisode > 0 {
-		// Filter out any episodes that are older than the most recent one.
-		if latestSeason > 0 {
-			Debug("Latest episode found is episode", latestEpisode, "of season", latestSeason)
+	if specificEp != "" {
+		Debug("Looking for specified episode")
+		ep := findSpecific(s.Episodes, specificEp)
+		if ep == (Episode{}) {
+			want = nil
 		} else {
-			Debug("Latest episode found is episode", latestEpisode)
-		}
-		for _, episode := range s.Episodes {
-			season, _ := strconv.Atoi(episode.Season)
-			number, _ := strconv.Atoi(episode.Number)
-			if season == latestSeason && number > latestEpisode {
-				want = append(want, episode)
-			}
+			want = []Episode{ep}
 		}
 	} else {
-		// We weren't able to determine the latest episode. We'll grab everything we don't already have.
-		Debug("Could not determine latest episode, syncing everything")
-		for _, episode := range s.Episodes {
-			if _, ok := have[episode.Title]; !ok {
-				want = append(want, episode)
-			}
+		Debug("Looking for most current episode already synced")
+		if err := filepath.Walk(s.Dir, walkFunc); err != nil {
+			return err
 		}
-	}
 
-	// Feed will list episodes newest to oldest. We'll reverse that here to make error handling easier later on.
-	length := len(want)
-	for i := 0; i < length/2; i++ {
-		want[i], want[length - 1 - i] = want[length - 1 - i], want[i]
+		if latestEpisode > 0 {
+			want = findNewer(s.Episodes, latestSeason, latestEpisode)
+		} else {
+			want = findUnsynced(s.Episodes, have)
+		}
+
+		// Feed will list episodes newest to oldest. We'll reverse that here to make error handling easier later on.
+		length := len(want)
+		for i := 0; i < length/2; i++ {
+			want[i], want[length - 1 - i] = want[length - 1 - i], want[i]
+		}
 	}
 
 	s.Episodes = want
 
 	return nil
+}
+
+
+// findSpecific finds the specified episode among the episodes available for download. A season can also be specified by
+// separating the season and episode numbers with a "-".
+func findSpecific(episodes []Episode, specified string) Episode {
+	if specified == "" {
+		return Episode{}
+	}
+
+	specificSeason := 0
+	specificEpisode := 0
+
+	parts := strings.Split(specified, "-")
+	switch len(parts) {
+	case 1:
+		// Only an episode was specified.
+		if num, err := strconv.Atoi(parts[0]); err != nil {
+			Debug("Error parsing specified episode:", err)
+			return Episode{}
+		} else {
+			specificEpisode = num
+		}
+	case 2:
+		// An episode and a season were specified.
+		if num, err := strconv.Atoi(parts[0]); err != nil {
+			Debug("Error parsing specified season:", err)
+			return Episode{}
+		} else {
+			specificSeason = num
+		}
+
+		if num, err := strconv.Atoi(parts[1]); err != nil {
+			Debug("Error parsing specified episode:", err)
+			return Episode{}
+		} else {
+			specificEpisode = num
+		}
+	default:
+		Debug("Error parsing specified episode/season")
+		return Episode{}
+	}
+
+	for _, episode := range episodes {
+		season, _ := strconv.Atoi(episode.Season)
+		number, _ := strconv.Atoi(episode.Number)
+		if season == specificSeason && number == specificEpisode {
+			if specificSeason > 0 {
+				Debug("Found episode", specificEpisode, "of season", specificSeason)
+			} else {
+				Debug("Found episode", specificEpisode)
+			}
+			return episode
+		}
+	}
+
+	// If we're here, then we didn't find anything.
+	return Episode{}
+}
+
+// findNewer sifts through the episodes available for download and finds any that are newer than the most recent one
+// already downloaded.
+func findNewer(episodes []Episode, latestSeason int, latestEpisode int) []Episode {
+	newer := []Episode{}
+
+	if latestSeason > 0 {
+		Debug("Latest episode found is episode", latestEpisode, "of season", latestSeason)
+	} else {
+		Debug("Latest episode found is episode", latestEpisode)
+	}
+
+	for _, episode := range episodes {
+		season, _ := strconv.Atoi(episode.Season)
+		number, _ := strconv.Atoi(episode.Number)
+		if season == latestSeason && number > latestEpisode {
+			newer = append(newer, episode)
+		}
+	}
+
+	return newer
+}
+
+// findUnsynced compares the list of episodes already downloaded to the list of episodes available for download and removes any
+// matches. It returns the episodes available for download but not yet downloaded.
+func findUnsynced(episodes []Episode, have map[string]int) []Episode {
+	unsynced := []Episode{}
+
+	Debug("Could not determine latest episode, syncing everything")
+
+	for _, episode := range episodes {
+		if _, ok := have[episode.Title]; !ok {
+			unsynced = append(unsynced, episode)
+		}
+	}
+
+	return unsynced
 }
 
 
