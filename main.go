@@ -14,7 +14,9 @@ var (
 
 
 func main() {
-	downDir := flag.String("d", "", "directory where shows will be synced")
+	dirArg := flag.String("d", "", "required, main download directory for all podcasts")
+	urlArg := flag.String("u", "", "required, URL of show's RSS feed")
+	numArg := flag.Int("n", 0, "optional, episode number to download")
 	debugFlag := flag.Bool("debug", false, "enable debug mode")
 	flag.Parse()
 
@@ -23,49 +25,38 @@ func main() {
 		Debug("Debug mode enabled")
 	}
 
+	// Make sure we were provided a URL.
+	if *urlArg == "" {
+		fmt.Println("No show specified")
+		fmt.Println("Usage:")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	fmt.Println("Beginning sync process")
+
+	u, err := url.Parse(strings.ToLower(*urlArg))
+	if err != nil {
+		fmt.Println("Invalid URL:", err)
+		fmt.Println("Usage:")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	show := Show{URL: u}
+
 	// Validate (or create) the download directory.
-	if err := ValidateDir(*downDir); err != nil {
+	if err := ValidateDir(*dirArg); err != nil {
 		fmt.Println(err)
+		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
-	}
-
-	// Make sure we were provided something.
-	urls := flag.Args()
-	if len(urls) == 0 {
-		fmt.Println("No shows specified")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	word := "show"
-	if len(urls) > 1 {
-		word = "shows"
-	}
-	fmt.Println("Beginning sync process for", len(urls), word)
-
-	// Collect together the shows that we want to sync.
-	shows := make([]Show, len(urls))
-	for i, v := range urls {
-		u, err := url.Parse(strings.ToLower(v))
-		if err != nil {
-			fmt.Println("Invalid URL:", v)
-			fmt.Println(err)
-			flag.PrintDefaults()
-			os.Exit(1)
-		}
-		shows[i].URL = u
 	}
 
 	// And sync them.
-	total := 0
-	for _, show := range shows {
-		fmt.Println("Syncing", show.URL)
-		n, err := show.Sync(*downDir)
-		if err != nil {
-			fmt.Println(err)
-		}
-		total += n
+	n, err := show.Sync(*dirArg)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
-	fmt.Println("Synced", total, "episodes")
+	fmt.Println("Synced", n, "episodes")
 }
