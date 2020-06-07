@@ -80,11 +80,8 @@ func (e *Episode) Download(showDir string) error {
 	if err != nil {
 		return err
 	}
+	bar.Finish()
 
-	// Because we've been mucking around with carriage returns, we need to manually move down a row.
-	fmt.Println()
-
-	Debug("--- Episode downloaded ---")
 	return nil
 }
 
