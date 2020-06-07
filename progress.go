@@ -6,23 +6,23 @@ import (
 )
 
 
-// ProgressBar is used to display a progress bar during the download operation.
-type ProgressBar struct {
+// Progress is used to keep track during the download process and to display a progress bar during the operation.
+type Progress struct {
 	total       int    // total number of bytes to be downloaded
 	totalString string // size of file to be downloaded, ready for printing
 	have        int    // number of bytes we currently have
-	count       int    // running count of write operations, for determining if we should print or not
+	writeCount  int    // running count of write operations, for determining if we should print or not
 }
 
 
 // Write prints the number of bytes written to stdout.
-func (pr *ProgressBar) Write(p []byte) (int, error) {
+func (pr *Progress) Write(p []byte) (int, error) {
 	n := len(p)
 	pr.have += n
 
 	// We don't need to do expensive print operations that often.
-	pr.count++
-	if pr.count % 50 > 0 {
+	pr.writeCount++
+	if pr.writeCount % 50 > 0 {
 		return n, nil
 	}
 

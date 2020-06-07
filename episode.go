@@ -37,7 +37,7 @@ type Episode  struct {
 
 // Download downloads the episode. The bytes will stream through this path from web to disk:
 // Internet -> http object -> Episode object -> Disk
-//             \-> Progress Bar object   \-> Meta object
+//             \-> Progress object   \-> Meta object
 func (e *Episode) Download(showDir string) error {
 	Debug("\n--- Downloading episode ---")
 
@@ -68,7 +68,7 @@ func (e *Episode) Download(showDir string) error {
 		return fmt.Errorf("%v", resp.Status)
 	}
 
-	bar := ProgressBar{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
+	bar := Progress{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
 	tee := io.TeeReader(resp.Body, &bar)
 
 	// Connect the episode on both ends of the flow.
