@@ -25,7 +25,7 @@ type Episode  struct {
 	Date        string    `xml:"pubDate"`
 	Enclosure   struct {
 		URL         string    `xml:"url,attr"`
-		Size        string    `xml:"length,attr"` // TODO: currently unused
+		Size        string    `xml:"length,attr"`
 		Type        string    `xml:"type,attr"`
 	} `xml:"enclosure"`
 
@@ -64,6 +64,12 @@ func (e *Episode) Download(showDir string) error {
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("%v", resp.Status)
+	}
+
+	if resp.ContentLength != e.Size {
+		fmt.Println("Warning: RSS feed is reporting episode size different than currently exists")
+		Debug("RSS feed size: ", e.Size, "bytes")
+		Debug("Available size:", resp.ContentLength, "bytes")
 	}
 
 	bar := Progress{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
