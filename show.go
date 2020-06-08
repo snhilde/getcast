@@ -77,8 +77,18 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 
 	Debug("Downloading", len(s.Episodes), "episodes")
 	for i, episode := range s.Episodes {
-		if err := episode.Download(s.Dir); err != nil {
-			return i, fmt.Errorf("Error downloading episode:", err)
+		fmt.Println("\n--- Downloading", episode.Title, "---")
+		// Try up to 3 times to download the episode properly.
+		for j := 1; j <= 3; j++ {
+			if err := episode.Download(s.Dir); err == errDownload {
+				if j < 3 {
+					fmt.Println("Download attempt", j, "of 3 failed, trying again")
+				} else {
+					return i, fmt.Errorf("ERROR: All 3 download attempts failed")
+				}
+			} else if err != nil {
+				return i, fmt.Errorf("Error downloading episode:", err)
+			}
 		}
 	}
 
@@ -277,7 +287,6 @@ func findUnsynced(episodes []Episode, have map[string]int) []Episode {
 
 	return unsynced
 }
-
 
 // isAudio determines if the provided file is an audio file or not.
 func isAudio(filename string) bool {

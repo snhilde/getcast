@@ -39,8 +39,6 @@ type Episode  struct {
 // Internet -> http object -> Episode object -> Disk
 //             \-> Progress object   \-> Meta object
 func (e *Episode) Download(showDir string) error {
-	Debug("\n--- Downloading episode ---")
-
 	if showDir == "" {
 		return fmt.Errorf("Missing download directory")
 	}

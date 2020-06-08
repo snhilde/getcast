@@ -1,8 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+)
+
+
+var (
+	errDownload = errors.New("Error downloading correct data")
 )
 
 
@@ -17,10 +23,6 @@ type Progress struct {
 
 // Write prints the number of bytes written to stdout.
 func (pr *Progress) Write(p []byte) (int, error) {
-	if pr == nil {
-		return 0, fmt.Errorf("Invalid Progress object")
-	}
-
 	n := len(p)
 	pr.have += n
 
@@ -48,10 +50,6 @@ func (pr *Progress) String() string {
 
 // Finish cleans up the terminal line and prints the overall success of the download operation.
 func (pr *Progress) Finish() error {
-	if pr == nil {
-		return fmt.Errorf("Invalid Progress object")
-	}
-
 	// Print the final status.
 	fmt.Printf("\r%s", strings.Repeat(" ", 50))
 	fmt.Printf("%v", pr.String())
@@ -62,9 +60,11 @@ func (pr *Progress) Finish() error {
 	if pr.have != pr.total {
 		Debug("Expected", pr.total, "bytes, Received", pr.have, "bytes")
 		if pr.have < pr.total {
-			return fmt.Errorf("Failed to download entire episode")
+			Debug("Failed to download entire episode")
+		} else {
+			Debug("Downloaded more bytes than expected")
 		}
-		return fmt.Errorf("Downloaded more bytes than expected")
+		return errDownload
 	}
 
 	fmt.Println("Episode successfully downloaded")
