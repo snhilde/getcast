@@ -227,7 +227,12 @@ func (e *Episode) validateData() error {
 	if e.Title == "" {
 		return fmt.Errorf("Missing episode title")
 	}
-	e.Title = SanitizeTitle(e.Title) + mimeToExt(e.Enclosure.Type)
+
+	e.Title = SanitizeTitle(e.Title)
+	ext := mimeToExt(e.Enclosure.Type)
+	if !strings.HasSuffix(e.Title, ext) {
+		e.Title += ext
+	}
 
 	Debug("Validating episode link:", e.Enclosure.URL)
 	if e.Enclosure.URL == "" {
