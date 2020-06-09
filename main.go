@@ -14,10 +14,10 @@ var (
 
 
 func main() {
-	debugFlag := flag.Bool("debug", false, "Enable debug mode")
 	urlArg := flag.String("u", "", "Required, URL of show's RSS feed")
 	dirArg := flag.String("d", "", "Required, Main download directory for all podcasts")
 	numArg := flag.String("n", "", "(Optional) Episode number to download. If podcast also has season, specify the episode like this: seasonNum-episodeNum, e.g. 3-5 to download episode 5 of season 3.")
+	debugFlag := flag.Bool("v", false, "Enable debug mode")
 	flag.Parse()
 
 	if (*debugFlag) {
