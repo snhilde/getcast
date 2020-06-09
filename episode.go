@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"net/http"
+	"strconv"
 	"time"
 	"strings"
 	"path/filepath"
@@ -70,9 +71,10 @@ func (e *Episode) Download(showDir string) error {
 		return fmt.Errorf("%v", resp.Status)
 	}
 
-	if resp.ContentLength != e.Size {
+	size, err := strconv.Atoi(e.Enclosure.Size)
+	if err == nil && int(resp.ContentLength) != size {
 		fmt.Println("Warning: RSS feed is reporting episode size different than currently exists")
-		Debug("RSS feed size: ", e.Size, "bytes")
+		Debug("RSS feed size: ", size, "bytes")
 		Debug("Available size:", resp.ContentLength, "bytes")
 	}
 
