@@ -89,6 +89,8 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 				}
 			} else if err != nil {
 				return i, fmt.Errorf("Error downloading episode:", err)
+			} else {
+				break
 			}
 		}
 	}
