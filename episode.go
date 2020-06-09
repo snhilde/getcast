@@ -3,11 +3,13 @@ package main
 import (
 	"io"
 	"fmt"
-	"path/filepath"
 	"os"
 	"net/http"
-	"strings"
 	"time"
+	"strings"
+	"path/filepath"
+	"net/url"
+	"io/ioutil"
 )
 
 
@@ -16,11 +18,13 @@ type Episode  struct {
 	// Show information
 	showTitle   string
 	showArtist  string
+	showImage   string
 
 	// Episode information
 	Title       string    `xml:"title"`
 	Season      string    `xml:"season"`
 	Number      string    `xml:"episode"`
+	Image       string    `xml:"image,href"`
 	Desc        string    `xml:"description"`
 	Date        string    `xml:"pubDate"`
 	Enclosure   struct {
@@ -137,6 +141,14 @@ func (e *Episode) SetShowArtist(artist string) {
 	}
 }
 
+// SetShowImage sets the image link of the episode's show. If no image is found for the episode, it will default to the
+// value set here.
+func (e *Episode) SetShowImage(image string) {
+	if e != nil {
+		e.showImage = image
+	}
+}
+
 
 // addFrames fleshes out the metadata with information from the episode. If a frame already exists in the metadata, it
 // will not be overwritten with data from the RSS feed. The only exceptions to this rule are the show and episode
@@ -163,16 +175,18 @@ func (e *Episode) addFrames() {
 		{ "PCST", "1"             },
 	}
 
-	// We always want the show and episode titles to match the contents of the RSS feed.
-	e.meta.SetFrame("TALB", []byte(e.showTitle))
-	e.meta.SetFrame("TIT2", []byte(e.Title))
-
+	// Set these frames from the table above.
 	for _, frame := range frames {
 		if e.meta.GetFrame(frame.frame) == nil {
 			e.meta.SetFrame(frame.frame, []byte(frame.value))
 		}
 	}
 
+	// We always want the show and episode titles to match the contents of the RSS feed.
+	e.meta.SetFrame("TALB", []byte(e.showTitle))
+	e.meta.SetFrame("TIT2", []byte(e.Title))
+
+	// We have to manually add the date and format it according the ID3v2 version we're using.
 	if e.Date != "" {
 		if time, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
 			switch e.meta.Version() {
@@ -193,17 +207,12 @@ func (e *Episode) addFrames() {
 			}
 		}
 	}
-}
 
-// buildFilename pieces together the different components of the episode into one absolute-path filename.
-func (e *Episode) buildFilename(path string) string {
-	// Let's first check if the title contains the episode number. If it doesn't, then we want to add it so as to
-	// improve the filesystem sorting.
-	if e.Number != "" && !strings.Contains(e.Title, e.Number) {
-		e.Title = e.Number + " - " + e.Title
+	// If the episode has an image, we'll add that. Otherwise, we'll try to get the default image of the show.
+	image := e.downloadImage()
+	if e.meta.GetFrame("APIC") == nil {
+		e.meta.SetFrame("APIC", image)
 	}
-
-	return filepath.Join(path, e.Title)
 }
 
 // validateData checks that we have all of the required fields from the RSS feed.
@@ -229,6 +238,62 @@ func (e *Episode) validateData() error {
 	}
 
 	return nil
+}
+
+// buildFilename pieces together the different components of the episode into one absolute-path filename.
+func (e *Episode) buildFilename(path string) string {
+	// Let's first check if the title contains the episode number. If it doesn't, then we want to add it so as to
+	// improve the filesystem sorting.
+	if e.Number != "" && !strings.Contains(e.Title, e.Number) {
+		e.Title = e.Number + " - " + e.Title
+	}
+
+	return filepath.Join(path, e.Title)
+}
+
+// downloadImage downloads either the episode (preferred) or show (fallback) image. If no link exists or there's any
+// trouble downloading the image, this return nil.
+func (e *Episode) downloadImage() []byte {
+	if e == nil {
+		return nil
+	}
+	Debug("Downloading image")
+
+	var u *url.URL
+	var err error
+	if e.Image != "" {
+		u, err = url.Parse(e.Image)
+	} else if e.showImage != "" {
+		u, err = url.Parse(e.showImage)
+	} else {
+		Debug("No episode or show image to download")
+		return nil
+	}
+
+	if u == nil || err != nil {
+		Debug("Error parsing episode/show image link")
+		return nil
+	}
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		Debug("Error getting image information:", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		Debug("Error accessing image:", resp.StatusCode)
+		return nil
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		Debug("Error retrieving image:", err)
+		return nil
+	}
+
+	return data
 }
 
 

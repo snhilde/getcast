@@ -20,7 +20,7 @@ type Show struct {
 	Dir        string  // show's directory on disk
 	Title      string  `xml:"channel>title"`
 	Author     string  `xml:"channel>author"`
-	Image      string  `xml:"channel>image"` // TODO: image/url?
+	Image      string  `xml:"channel>image,href"`
 	Episodes []Episode `xml:"channel>item"`
 }
 
@@ -54,6 +54,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	for i := range s.Episodes {
 		s.Episodes[i].SetShowTitle(s.Title)
 		s.Episodes[i].SetShowArtist(s.Author)
+		s.Episodes[i].SetShowImage(s.Image)
 	}
 
 	// Validate (or create) this show's directory.
