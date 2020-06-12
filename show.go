@@ -88,7 +88,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 					return i, fmt.Errorf("ERROR: All 3 download attempts failed")
 				}
 			} else if err != nil {
-				return i, fmt.Errorf("Error downloading episode:", err)
+				return i, fmt.Errorf("Error downloading episode: %v", err)
 			} else {
 				break
 			}
