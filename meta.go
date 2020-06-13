@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"bytes"
 	"fmt"
 	"io"
@@ -8,6 +9,11 @@ import (
 	"strconv"
 	"golang.org/x/text/encoding/unicode"
 	"unsafe"
+)
+
+
+var (
+	badMeta = errors.New("Invalid meta object")
 )
 
 
@@ -36,7 +42,7 @@ func NewMeta(file []byte) *Meta {
 // operation.
 func (m *Meta) Write(p []byte) (int, error) {
 	if m == nil {
-		return 0, fmt.Errorf("Invalid meta object")
+		return 0, badMeta
 	}
 
 	if m.buffer == nil {
@@ -74,6 +80,16 @@ func (m *Meta) Write(p []byte) (int, error) {
 	need := length - (m.buffer.Len() - len(p))
 	m.buffer.Truncate(length)
 	return need, io.ErrShortWrite
+}
+
+// ReadFrom reads from the io.Reader into the Meta object.
+func (m *Meta) ReadFrom(r io.Reader) (int, error) {
+	if m == nil {
+		return 0, badMeta
+	}
+
+	n, err := io.Copy(m, r)
+	return int(n), err
 }
 
 // Buffered checks if all of the metadata for the episode's file has been fully buffered or not. If the file doesn't
