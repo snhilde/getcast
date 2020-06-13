@@ -5,6 +5,8 @@ import (
 	"path"
 	"os/exec"
 	"strings"
+	"os"
+	"io"
 )
 
 
@@ -52,6 +54,8 @@ var testData = []struct {
 
 // Test the ability to read metadata correctly. The mp3 files to read are local files.
 func TestReadMetaLocal(t *testing.T) {
+	// First, let's make sure that ffprobe is finding the correct metadata in our test files. If that looks good, then
+	// we can see how our solution is looking.
 	for _, test := range testData {
 		probeMeta, err := runProbe(test.filepath)
 		if err != nil {
@@ -73,6 +77,31 @@ func TestReadMetaLocal(t *testing.T) {
 		if len(probeMeta) != 0 {
 			t.Error(len(probeMeta), "unexpected keys remain in metadata for", filename)
 			t.Log("Keys remaining:", probeMeta)
+		}
+	}
+
+	// Now, let's see how our reader stacks up.
+	for _, test := range testData {
+		meta := NewMeta(nil)
+		filename := path.Base(test.filepath)
+
+		file, err := os.Open(test.filepath)
+		if err != nil {
+			t.Error(filename, "-", err)
+		}
+
+		if _, err := meta.ReadFrom(file); err != io.ErrShortWrite {
+			t.Error(filename, "-", err)
+		}
+		file.Close()
+
+		for key, value := range test.metadata {
+			found := string(meta.GetFrame(key))
+			if value != found {
+				t.Error("Mismatch with key", key, "for", filename)
+				t.Log("\tExpected:", value)
+				t.Log("\tFound:", found)
+			}
 		}
 	}
 }
