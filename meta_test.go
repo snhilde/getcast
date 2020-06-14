@@ -96,7 +96,7 @@ func TestReadMetaLocal(t *testing.T) {
 		file.Close()
 
 		for key, value := range test.metadata {
-			found := string(meta.GetFrame(key))
+			found := string(meta.GetFrame(nameToFrame(key)))
 			if value != found {
 				t.Error("Mismatch with key", key, "for", filename)
 				t.Log("\tExpected:", value)
@@ -135,4 +135,34 @@ func runProbe(path string) (map[string]string, error) {
 	}
 
 	return meta, nil
+}
+
+// nameToFrame maps the human-readable tag name to the ID3v2 frame name.
+func nameToFrame(name string) string {
+	switch name {
+		case "title":
+			return "TIT2"
+		case "artist":
+			return "TPE1"
+		case "album":
+			return "TALB"
+		case "track":
+			return "TRCK"
+		case "date":
+			return "TDRC" // ID3v2.4 only
+		case "genre":
+			return "TCON"
+		case "comment":
+			return "COMM"
+		case "description":
+			return "TDES"
+		case "season":
+			return "TPOS"
+		case "url":
+			return "WOAF"
+		case "Additional Tag":
+	}
+
+	// If we can't map it, we'll assume it's already a frame name.
+	return name
 }
