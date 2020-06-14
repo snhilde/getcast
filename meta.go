@@ -336,29 +336,31 @@ func (m *Meta) parseFrames() error {
 
 		// We only want the frame if these flags are not set.
 		if flags[1] & 0x0C > 0 {
+			Debug("Skipping frame")
 			continue
 		}
 
 		switch value[0] {
 		case 0x00:
-			// ASCII characters. Remove the first and last bytes.
-			value = value[1:len(value)-1]
+			// ASCII characters. Remove the first byte.
+			value = value[1:]
 		case 0x01:
-			// UTF-16 with BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
-			value = value[1:len(value)-2]
+			// UTF-16 with BOM. Remove the first byte and decode to UTF-8.
+			value = value[1:]
 			decoder := unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder()
 			value, _ = decoder.Bytes(value)
 		case 0x02:
-			// UTF-16 Big Endian without BOM. Remove the first byte and the last 2 bytes and decode to UTF-8.
-			value = value[1:len(value)-2]
+			// UTF-16 Big Endian without BOM. Remove the first byte and decode to UTF-8.
+			value = value[1:]
 			decoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
 			value, _ = decoder.Bytes(value)
 		case 0x03:
-			// UTF-8 (Unicode). Remove the first and last bytes.
-			value = value[1:len(value)-1]
+			// UTF-8 (Unicode). Remove the first byte.
+			value = value[1:]
 		}
 
 		Debug("Found", string(id), "-", string(value))
+		fmt.Println(string(id), size, string(value))
 		m.frames[string(id)] = value
 	}
 
