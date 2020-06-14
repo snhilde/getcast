@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"bytes"
-	"fmt"
 	"io"
 	"strings"
 	"strconv"
@@ -120,6 +119,15 @@ func (m * Meta) Buffered() bool {
 	return m.buffered
 }
 
+// Bytes returns all the bytes currently buffered.
+func (m *Meta) Bytes() []byte {
+	if m == nil {
+		return nil
+	}
+
+	return m.buffer.Bytes()
+}
+
 // Version returns the version of ID3v2 metadata in use, or "" if not found.
 func (m *Meta) Version() string {
 	if m == nil || m.noMeta || m.buffer.Len() < 4 {
@@ -127,7 +135,7 @@ func (m *Meta) Version() string {
 	}
 
 	data := m.buffer.Bytes()
-	return fmt.Sprintf("%v", data[3])
+	return string('0' + data[3])
 }
 
 // GetFrame returns the value of the specified frame, or nil if no frame exists with that name. The name will be matched
@@ -269,7 +277,7 @@ func (m *Meta) buildFrames() []byte {
 // metadata is present or metadata is present but no frames exist, this will create an empty, non-nil dictionary.
 func (m *Meta) parseFrames() error {
 	if !m.Buffered() {
-		return fmt.Errorf("Missing metadata to parse")
+		return errors.New("Missing metadata to parse")
 	} else if m.noMeta {
 		return nil
 	} else if m.frames != nil {
@@ -360,7 +368,6 @@ func (m *Meta) parseFrames() error {
 		}
 
 		Debug("Found", string(id), "-", string(value))
-		fmt.Println(string(id), size, string(value))
 		m.frames[string(id)] = value
 	}
 
