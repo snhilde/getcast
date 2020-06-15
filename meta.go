@@ -5,22 +5,30 @@ import (
 	"bytes"
 	"io"
 	"strings"
-	"strconv"
 	"golang.org/x/text/encoding/unicode"
 	"unsafe"
 )
 
 
 var (
+	// badMeta is the error returned when a nil meta object is used.
 	badMeta = errors.New("Invalid meta object")
 )
 
 
+// Type Meta is the main type used. It holds all the information related to the metadata.
 type Meta struct {
-	buffer   *bytes.Buffer      // buffer to store filedata between successive Write operations
-	buffered  bool              // whether or not all metadata is present in the buffer
-	noMeta    bool              // whether or not the file has any metadata
-	frames    map[string][]byte // cached dictionary of frames
+	buffer    *bytes.Buffer // buffer to store filedata between successive Write operations
+	buffered   bool         // whether or not all metadata is present in the buffer
+	noMeta     bool         // whether or not the file has any metadata
+	readMeta   bool         // whether or not the metadata has been read and parsed.
+	frames   []Frame        // list of frames
+}
+
+// Type Frame is used to store information about a metadata frame.
+type Frame struct {
+	id      string
+	value []byte
 }
 
 
@@ -114,6 +122,7 @@ func (m * Meta) Buffered() bool {
 
 	if m.buffer.Len() >= length {
 		m.buffered = true
+		m.parseFrames()
 	}
 
 	return m.buffered
@@ -128,60 +137,66 @@ func (m *Meta) Bytes() []byte {
 	return m.buffer.Bytes()
 }
 
-// Version returns the version of ID3v2 metadata in use, or "" if not found.
-func (m *Meta) Version() string {
+// Version returns the version of ID3v2 metadata in use, or 0 if not found.
+func (m *Meta) Version() byte {
 	if m == nil || m.noMeta || m.buffer.Len() < 4 {
-		return ""
+		return 0
 	}
 
 	data := m.buffer.Bytes()
-	return string('0' + data[3])
+	return data[3]
 }
 
-// GetFrame returns the value of the specified frame, or nil if no frame exists with that name. The name will be matched
-// in a case-sensitive comparison.
-func (m *Meta) GetFrame(frame string) []byte {
+// NumFrames returns the number of frames in the metadata. If multiple frames have the same frame ID, each instance of
+// the ID is counted separately.
+func (m *Meta) NumFrames() int {
+	if m == nil || m.noMeta || !m.Buffered() {
+		return 0
+	}
+
+	return len(m.frames)
+}
+
+// GetValues returns all values for the given frame ID. The name will be matched in a case-sensitive comparison.
+func (m *Meta) GetValues(id string) [][]byte {
 	if m == nil || !m.Buffered() {
 		return nil
 	}
 
-	// If we haven't cached the frames yet, do so now.
-	if m.frames == nil {
-		if err := m.parseFrames(); err != nil {
-			Debug("Failed to parse frames:", err)
-			return nil
-		}
-		if m.frames == nil {
-			Debug("Didn't find any frames")
-			m.frames = make(map[string][]byte)
+	var values [][]byte
+	for _, frame := range m.frames {
+		if frame.id == id {
+			values = append(values, frame.value)
 		}
 	}
 
-	return m.frames[frame]
+	return values
 }
 
-// SetFrame sets the frame with the value. Value should be UTF-8 encoded.
-func (m *Meta) SetFrame(frame string, value []byte) {
+// SetValue adds the value for this frame ID into the metadata. Value should be UTF-8 encoded. If multiple is true, the
+// metadata is allowed to have multiple frames with the same frame ID. Otherwise, this frame is the only frame allowed
+// to have this frame ID.
+func (m *Meta) SetValue(id string, value []byte, multiple bool) {
 	if m == nil || !m.Buffered() {
 		return
 	}
 
-	// If we haven't cached the frames yet, do so now.
-	if m.frames == nil {
-		if err := m.parseFrames(); err != nil {
-			Debug("Failed to parse frames:", err)
-			return
+	if len(id) == 4 {
+		id = strings.ToUpper(id)
+		if !multiple {
+			// Remove all frames with matching ID.
+			var frames []Frame
+			for _, frame := range m.frames {
+				if frame.id != id {
+					frames = append(frames, frame)
+				}
+			}
+			m.frames = frames
 		}
-		if m.frames == nil {
-			Debug("Didn't find any frames")
-			m.frames = make(map[string][]byte)
-		}
-	}
-
-	if len(frame) == 4 {
-		frame = strings.ToUpper(frame)
-		m.frames[frame] = value
-		Debug("Set frame", frame, "to", string(value))
+		m.frames = append(m.frames, Frame{id, value})
+		Debug("Set frame", id, "to", string(value))
+	} else {
+		Debug("Invalid frame ID:", id)
 	}
 }
 
@@ -206,11 +221,10 @@ func (m *Meta) Build() []byte {
 
 	// Write major version.
 	version := m.Version()
-	if version == "" {
-		version = "4"
+	if version == 0 {
+		version = 4
 	}
-	v, _ := strconv.Atoi(version)
-	metadata.WriteByte(byte(v))
+	metadata.WriteByte(version)
 
 	// Write minor version.
 	metadata.WriteByte(0x00)
@@ -229,59 +243,42 @@ func (m *Meta) Build() []byte {
 }
 
 
-// buildFrames builds only the frames of the episode's metadata from the internal dictionary of id/value pairs.
+// buildFrames builds only the frames of the episode's metadata from the internal list of id/value pairs.
 func (m *Meta) buildFrames() []byte {
 	if m == nil || !m.Buffered() {
 		return nil
 	}
 	Debug("Building metadata frames")
 
-	if m.frames == nil {
-		if err := m.parseFrames(); err != nil {
-			Debug("Failed to parse existing frames")
-			return nil
-		}
-	}
-
-	if len(m.frames) == 0 {
-		Debug("No frames to build")
-		return nil
-	}
-
 	buf := new(bytes.Buffer)
-	for id, value := range m.frames {
-		if len(id) != 4 {
+	for _, frame := range m.frames {
+		if len(frame.id) != 4 {
 			continue
 		}
 
 		// Write ID.
-		buf.WriteString(strings.ToUpper(id))
+		buf.WriteString(strings.ToUpper(frame.id))
 
 		// Write length. (+2 for encoding bytes around value.)
-		length := writeLen(len(value) + 2)
+		length := writeLen(len(frame.value) + 2)
 		buf.Write(length)
 
 		// Write flags.
 		buf.Write([]byte{0x00, 0x00})
 
-		// Write value. (0x03 header with 0x00 footer indicates that the value is UTF-8. We store everything as UTF-8)
+		// Write value. 0x03 header with 0x00 footer indicates that the value is UTF-8. (We store everything as UTF-8.)
 		buf.WriteByte(0x03)
-		buf.Write(value)
+		buf.Write(frame.value)
 		buf.WriteByte(0x00)
 	}
 
 	return buf.Bytes()
 }
 
-// parseFrames creates the internal dictionary of all frames (represented as id/value pairs) in the metadata. If no
-// metadata is present or metadata is present but no frames exist, this will create an empty, non-nil dictionary.
-func (m *Meta) parseFrames() error {
-	if !m.Buffered() {
-		return errors.New("Missing metadata to parse")
-	} else if m.noMeta {
-		return nil
-	} else if m.frames != nil {
-		return nil
+// parseFrames creates the internal list of all frames (represented as id/value pairs) in the metadata.
+func (m *Meta) parseFrames() {
+	if !m.buffered {
+		return
 	}
 
 	buf := bytes.NewBuffer(m.buffer.Bytes())
@@ -306,9 +303,8 @@ func (m *Meta) parseFrames() error {
 		buf.Next(length - 4)
 	}
 
-	// If we encounter any error while reading the metadata, we have to bail out with what we've got because we dont'
+	// If we encounter any error while reading the metadata, we have to bail out with what we've got, because we don't
 	// know how to continue parsing the rest of the frames. A good area for future development would be to enhance this.
-	m.frames = make(map[string][]byte)
 	for buf.Len() > 0 {
 		// Read frame ID. The ID must be uppercase letters or numbers.
 		id := buf.Next(4)
@@ -366,12 +362,11 @@ func (m *Meta) parseFrames() error {
 			// UTF-8 (Unicode). Remove the first byte.
 			value = value[1:]
 		}
+		value = bytes.TrimSuffix(value, []byte{0x00})
 
 		Debug("Found", string(id), "-", string(value))
-		m.frames[string(id)] = value
+		m.frames = append(m.frames, Frame{string(id), value})
 	}
-
-	return nil
 }
 
 // length returns the reported length in bytes of the entire metadata, or -1 if the metadata could not be successfully

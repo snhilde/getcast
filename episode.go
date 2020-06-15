@@ -159,7 +159,7 @@ func (e *Episode) addFrames() {
 	Debug("Building metadata frames")
 
 	frames := []struct {
-		frame string
+		id    string
 		value string
 	}{
 		// Show information
@@ -179,32 +179,32 @@ func (e *Episode) addFrames() {
 
 	// Set these frames from the table above.
 	for _, frame := range frames {
-		if e.meta.GetFrame(frame.frame) == nil {
-			e.meta.SetFrame(frame.frame, []byte(frame.value))
+		if values := e.meta.GetValues(frame.id); values == nil || len(values) == 0 {
+			e.meta.SetValue(frame.id, []byte(frame.value), false)
 		}
 	}
 
 	// We always want the show and episode titles to match the contents of the RSS feed.
-	e.meta.SetFrame("TALB", []byte(e.showTitle))
-	e.meta.SetFrame("TIT2", []byte(e.Title))
+	e.meta.SetValue("TALB", []byte(e.showTitle), false)
+	e.meta.SetValue("TIT2", []byte(e.Title), false)
 
 	// We have to manually add the date and format it according the ID3v2 version we're using.
 	if e.Date != "" {
 		if time, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
 			switch e.meta.Version() {
-			case "3":
-				if e.meta.GetFrame("TYER") == nil {
-					e.meta.SetFrame("TYER", []byte(time.Format("2006"))) // YYYY
+			case 3:
+				if values := e.meta.GetValues("TYER"); values == nil || len(values) == 0 {
+					e.meta.SetValue("TYER", []byte(time.Format("2006")), false) // YYYY
 				}
-				if e.meta.GetFrame("TDAT") == nil {
-					e.meta.SetFrame("TDAT", []byte(time.Format("0201"))) // DDMM
+				if values := e.meta.GetValues("TDAT"); values == nil || len(values) == 0 {
+					e.meta.SetValue("TDAT", []byte(time.Format("0201")), false) // DDMM
 				}
-				if e.meta.GetFrame("TIME") == nil {
-					e.meta.SetFrame("TIME", []byte(time.Format("1504"))) // HHMM
+				if values := e.meta.GetValues("TIME"); values == nil || len(values) == 0 {
+					e.meta.SetValue("TIME", []byte(time.Format("1504")), false) // HHMM
 				}
-			case "4":
-				if e.meta.GetFrame("TDRC") == nil {
-					e.meta.SetFrame("TDRC", []byte(time.Format("20060102T150405"))) // YYYYMMDDTHHMMSS
+			case 4:
+				if values := e.meta.GetValues("TDRC"); values == nil || len(values) == 0 {
+					e.meta.SetValue("TDRC", []byte(time.Format("20060102T150405")), false) // YYYYMMDDTHHMMSS
 				}
 			}
 		}
@@ -212,8 +212,8 @@ func (e *Episode) addFrames() {
 
 	// If the episode has an image, we'll add that. Otherwise, we'll try to get the default image of the show.
 	image := e.downloadImage()
-	if e.meta.GetFrame("APIC") == nil {
-		e.meta.SetFrame("APIC", image)
+	if values := e.meta.GetValues("APIC"); values == nil || len(values) == 0 {
+		e.meta.SetValue("APIC", image, false)
 	}
 }
 

@@ -98,6 +98,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	return len(s.Episodes), nil
 }
 
+
 // filter filters out the episodes we don't want to download.
 func (s *Show) filter(specificEp string) error {
 	have := make(map[string]int)
@@ -132,14 +133,14 @@ func (s *Show) filter(specificEp string) error {
 		}
 
 		// We only want episodes from this show.
-		if value := meta.GetFrame("TALB"); string(value) != s.Title {
-			Debug("Episode is from a different show:", string(value))
+		if value := getFirstValue(meta, "TALB"); value != s.Title {
+			Debug("Episode is from a different show:", value)
 			return nil
 		}
 
 		season := 0
-		if value := meta.GetFrame("TPOS"); value != nil {
-			if num, err := strconv.Atoi(string(value)); err == nil {
+		if value := getFirstValue(meta, "TPOS"); value != "" {
+			if num, err := strconv.Atoi(value); err == nil {
 				season = num
 				if season > latestSeason {
 					latestSeason = season
@@ -148,8 +149,8 @@ func (s *Show) filter(specificEp string) error {
 		}
 
 		episode := 0
-		if value := meta.GetFrame("TRCK"); value != nil {
-			if num, err := strconv.Atoi(string(value)); err == nil {
+		if value := getFirstValue(meta, "TRCK"); value != "" {
+			if num, err := strconv.Atoi(value); err == nil {
 				episode = num
 				if season == latestSeason && episode > latestEpisode {
 					latestEpisode = episode
@@ -289,6 +290,17 @@ func findUnsynced(episodes []Episode, have map[string]int) []Episode {
 	}
 
 	return unsynced
+}
+
+// getFirstValue gets the first value for the given frame ID. This is a convenience function for dealing with frame IDs
+// that should have only one occurrence.
+func getFirstValue(meta *Meta, id string) string {
+	values := meta.GetValues("TALB")
+	if values == nil || len(values) == 0 {
+		return ""
+	}
+
+	return string(values[0])
 }
 
 // isAudio determines if the provided file is an audio file or not.
