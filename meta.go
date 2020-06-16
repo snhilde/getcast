@@ -18,11 +18,11 @@ var (
 
 // Type Meta is the main type used. It holds all the information related to the metadata.
 type Meta struct {
-	buffer    *bytes.Buffer // buffer to store filedata between successive Write operations
-	buffered   bool         // whether or not all metadata is present in the buffer
-	noMeta     bool         // whether or not the file has any metadata
-	readMeta   bool         // whether or not the metadata has been read and parsed.
-	frames   []Frame        // list of frames
+	buffer      *bytes.Buffer // buffer to store filedata between successive Write operations
+	buffered     bool         // whether or not all metadata is present in the buffer
+	noMeta       bool         // whether or not the file has any metadata
+	readFrames   bool         // whether or not the metadata frames have been read and parsed.
+	frames     []Frame        // list of frames
 }
 
 // Type Frame is used to store information about a metadata frame.
@@ -123,6 +123,7 @@ func (m * Meta) Buffered() bool {
 	if m.buffer.Len() >= length {
 		m.buffered = true
 		m.parseFrames()
+		m.readFrames = true
 	}
 
 	return m.buffered
@@ -277,7 +278,7 @@ func (m *Meta) buildFrames() []byte {
 
 // parseFrames creates the internal list of all frames (represented as id/value pairs) in the metadata.
 func (m *Meta) parseFrames() {
-	if !m.buffered {
+	if !m.buffered || m.readFrames {
 		return
 	}
 
