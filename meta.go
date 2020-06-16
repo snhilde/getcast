@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 	"golang.org/x/text/encoding/unicode"
-	"unsafe"
 )
 
 
@@ -136,6 +135,15 @@ func (m *Meta) Bytes() []byte {
 	}
 
 	return m.buffer.Bytes()
+}
+
+// Len returns the number of bytes currently buffered.
+func (m *Meta) Len() int {
+	if m == nil {
+		return 0
+	}
+
+	return m.buffer.Len()
 }
 
 // Version returns the version of ID3v2 metadata in use, or 0 if not found.
@@ -300,7 +308,7 @@ func (m *Meta) parseFrames() {
 
 	// Skip past the extended header, if present.
 	if flags & (1 << 6) > 0 {
-		length := readNum(buf.Next(4))
+		length := readLen(buf.Next(4))
 		buf.Next(length - 4)
 	}
 
@@ -321,7 +329,7 @@ func (m *Meta) parseFrames() {
 			break
 		}
 
-		size := readNum(buf.Next(4))
+		size := readLen(buf.Next(4))
 		if size <= 0 {
 			Debug("Stopping frame parse early: Invalid length for", string(id), "-", size)
 			break
@@ -406,7 +414,7 @@ func (m *Meta) length() int {
 	}
 
 	// Read metadata length.
-	length := readNum(buf.Next(4))
+	length := readLen(buf.Next(4))
 	if length < 0 {
 		return -1
 	}
@@ -416,16 +424,12 @@ func (m *Meta) length() int {
 }
 
 
-// readNum reads a big-endian number out of the bytes. If the number of bytes is greater than the memory size of int,
-// this will return -1.
-func readNum(buf []byte) int {
+// readLen reads a big-endian, synch-safe length out of the bytes. Synch-safe means that only the first 7 bits of each
+// byte are used for counting; the high bit is ignored.
+func readLen(buf []byte) int {
 	num := int(0)
-	if len(buf) > int(unsafe.Sizeof(num)) {
-		return -1
-	}
-
 	for _, b := range buf {
-		num <<= 8
+		num <<= 7
 		num |= int(b)
 	}
 
