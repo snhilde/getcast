@@ -116,6 +116,7 @@ func (m * Meta) Buffered() bool {
 
 	// A length of 0 means that the file has data but not any metadata.
 	if length == 0 {
+		m.noMeta = true
 		return true
 	}
 
@@ -394,7 +395,6 @@ func (m *Meta) length() int {
 
 	if string(buf.Next(3)) != "ID3" {
 		// The file has data but not any metadata.
-		m.noMeta = true
 		return 0
 	}
 
