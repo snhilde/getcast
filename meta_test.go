@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"strings"
 	"os"
-	"io"
 	"bytes"
 	"encoding/hex"
 	"io/ioutil"
@@ -63,83 +62,138 @@ func TestReadMetaLocal(t *testing.T) {
 	// First, let's make sure that ffprobe is finding the correct metadata in our test files. If that looks good, then
 	// we can see how our solution is looking.
 	for _, ref := range refData {
-		filename := path.Base(ref.filepath)
-		probeMeta, err := runProbe(ref.filepath)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-
-		for _, frame := range ref.frames {
-			want := frame.value
-			have := probeMeta[frame.name]
-			if want != have {
-				t.Error(filename, "- Values do not match for id:", frame.name, "/", frame.id)
-				t.Log("\tExpected:", want)
-				t.Log("\tFound:", have)
-			}
-			delete(probeMeta, frame.name)
-		}
-
-		// Make sure we found everything that we expected to find.
-		if len(probeMeta) != 0 {
-			t.Error(len(probeMeta), "keys remain in metadata for", filename)
-			t.Log("Keys remaining:", probeMeta)
-		}
+		checkRefMeta(t, ref.filepath, ref.frames)
 	}
 
 	// Now, let's see how our reader stacks up.
 	for _, ref := range refData {
-		meta := NewMeta(nil)
-		filename := path.Base(ref.filepath)
+		checkRefFile(t, ref.filepath, ref.frames)
+	}
+}
 
-		file, err := os.Open(ref.filepath)
+// Test the ability to write metadata and files correctly. The files to copy and write are the same files in
+// TestReadMetaLocal.
+func TestWriteMetaLocal(t *testing.T) {
+	// Read the reference files into memory, copy them, and write them back out. If they're equal, then the write
+	// operation is good.
+	for _, ref := range refData {
+		filepath := ref.filepath
+		testName := path.Base(filepath)
+		meta, audio, err := readAudioFile(filepath)
 		if err != nil {
-			t.Error(filename, "-", err)
+			t.Error(testName, "-", err)
+			continue
 		}
 
-		if _, err := meta.ReadFrom(file); err != io.ErrShortWrite {
-			t.Error(filename, "-", err)
+		// If we read the correct amount of metadata out, then the first byte in the audio data should be 0xFF.
+		if audio[0] != 0xFF {
+			t.Error(testName, "- Audio data does not start with 0xFF")
 		}
-		file.Close()
 
-		// Go through all of the known frames and make sure our meta reader found the same values.
-		for _, frame := range ref.frames {
-			found := false
+		// Check that we copied the correct amount of metadata.
+		if meta.Len() != ref.metasize {
+			t.Error(testName, "- Metadata sizes do not match")
+			t.Log("\tExpected:", ref.metasize)
+			t.Log("\tReceived:", meta.Len())
+		}
 
-			// Look for a match in all of the values for this frame ID in the metadata.
-			values := meta.GetValues(frame.id)
-			for _, value := range values {
-				switch frame.id {
-				case "COMM":
-					// If this frame is present, then there are usually 2 instances of it: one that starts with 3 null
-					// bytes, and one that starts with three 'X' bytes. Either way, the next byte is a null separator
-					// followed by the value.
-					value = bytes.TrimLeft(value, string([]byte{0x00, 'X'}))
-					if string(value) == frame.value {
-						found = true
-					}
-				case "TXXX":
-					// This is the user-defined field. The frame name and frame value are separated by a null byte.
-					fields := bytes.SplitN(value, []byte{0x00}, 2)
-					if len(fields) == 2 && string(fields[0]) == frame.name && string(fields[1]) == frame.value {
-						found = true
-					}
-				default:
-					if string(value) == frame.value {
-						found = true
-					}
+		// Now let's write the file to disk.
+		filepath += "_tmp"
+		if !writeData(t, filepath, meta.Bytes(), audio) {
+			continue
+		}
+
+		// Let's use ffprobe to see if all of the metadata was written correctly.
+		checkRefMeta(t, filepath, ref.frames)
+
+		// And then do one more check with our reader.
+		checkRefFile(t, filepath, ref.frames)
+
+		// Now that we're done, we can remove the temporary file.
+		if err := os.Remove(filepath); err != nil {
+			t.Error(testName, "-", err)
+		}
+	}
+}
+
+
+// checkRefMeta compares the metadata of a reference file using ffprobe to the expected metadata in the ref table.
+func checkRefMeta(t *testing.T, filepath string, frames []refFrame) {
+	testName := path.Base(filepath)
+
+	// Get the frames from ffprobe's output.
+	probeMeta, err := runProbe(filepath)
+	if err != nil {
+		t.Error(testName, "-", err)
+		return
+	}
+
+	for _, frame := range frames {
+		want := frame.value
+		have := probeMeta[frame.name]
+		if want != have {
+			t.Error(testName, "- Values do not match for id:", frame.name, "/", frame.id)
+			t.Log("\tExpected:", want)
+			t.Log("\tFound:", have)
+		}
+		delete(probeMeta, frame.name)
+	}
+
+	// Make sure we found everything that we expected to find.
+	if len(probeMeta) != 0 {
+		t.Error(len(probeMeta), "keys remain in metadata for", testName)
+		t.Log("Keys remaining:", probeMeta)
+	}
+}
+
+// checkRefFile compares the metadata of a reference file using our meta reader to the expected metadata in the ref table.
+func checkRefFile(t *testing.T, filepath string, frames []refFrame) {
+	testName := path.Base(filepath)
+
+	meta, _, err := readAudioFile(filepath)
+	if err != nil {
+		t.Error(testName, "-", err)
+		return
+	}
+
+	// Go through all of the known frames and make sure our meta reader found the same values.
+	for _, frame := range frames {
+		found := false
+
+		// Look for a match in all of the values for this frame ID in the metadata.
+		values := meta.GetValues(frame.id)
+		for _, value := range values {
+			switch frame.id {
+			case "COMM":
+				// If this frame is present, then there are usually 2 instances of it: one that starts with 3 null
+				// bytes, and one that starts with three 'X' bytes. Either way, the next byte is a null separator
+				// followed by the value.
+				value = bytes.TrimLeft(value, string([]byte{0x00, 'X'}))
+				if string(value) == frame.value {
+					found = true
 				}
-				if found {
-					break
+			case "TXXX":
+				// This is the user-defined field. The frame name and frame value are separated by a null byte.
+				fields := bytes.SplitN(value, []byte{0x00}, 2)
+				if len(fields) == 2 && string(fields[0]) == frame.name && string(fields[1]) == frame.value {
+					found = true
+				}
+			default:
+				if string(value) == frame.value {
+					found = true
 				}
 			}
-			if !found {
-				t.Error(filename, "- value not found for id:", frame.id)
-				t.Log("\tExpected:", frame.value)
-				for _, value := range values {
+
+			if found {
+				break
+			}
+		}
+
+		if !found {
+			t.Error(testName, "- value not found for id:", frame.id)
+			t.Log("\tExpected:", frame.value)
+			for _, value := range values {
 				t.Log("\tFound:", hex.Dump(value))
-				}
 			}
 		}
 	}
@@ -174,4 +228,62 @@ func runProbe(path string) (map[string]string, error) {
 	}
 
 	return meta, nil
+}
+
+// readAudioFile reads the data from the audio file and splits it into metadata and audio data.
+func readAudioFile(path string) (*Meta, []byte, error) {
+	// Open the reference file.
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Get all the data from the file.
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	// Copy the metadata and the rest of the file.
+	meta := NewMeta(data)
+	audio := data[meta.Len():]
+
+	return meta, audio, nil
+}
+
+// writeData writes the metadata and audio data to the specified file.
+func writeData(t *testing.T, filepath string, meta, audio []byte) bool {
+	testName := path.Base(filepath)
+
+	file, err := os.Create(filepath)
+	if err != nil {
+		t.Error(testName, "-", err)
+		return false
+	}
+	defer file.Close()
+
+	// Write the metadata first.
+	if n, err := file.Write(meta); err != nil {
+		t.Error(testName, "-", err)
+		return false
+	} else if n != len(meta) {
+		t.Error(testName, "- Failed to write correct number of bytes")
+		t.Log("\tExpected:", len(meta))
+		t.Log("\tActual  :", n)
+		return false
+	}
+
+	// Then right the audio data.
+	if n, err := file.Write(audio); err != nil {
+		t.Error(testName, "-", err)
+		return false
+	} else if n != len(audio) {
+		t.Error(testName, "- Failed to write correct number of bytes")
+		t.Log("\tExpected:", len(audio))
+		t.Log("\tActual  :", n)
+		return false
+	}
+
+	return true
 }
