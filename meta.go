@@ -217,8 +217,13 @@ func (m *Meta) Build() []byte {
 	}
 	Debug("Building metadata")
 
+	version := m.Version()
+	if version == 0 {
+		version = 4
+	}
+
 	// Build out the frames first so we know how long the metadata is.
-	frames := m.buildFrames()
+	frames := m.buildFrames(version)
 	if frames == nil {
 		Debug("No track information exists")
 		return nil
@@ -230,10 +235,6 @@ func (m *Meta) Build() []byte {
 	metadata.WriteString("ID3")
 
 	// Write major version.
-	version := m.Version()
-	if version == 0 {
-		version = 4
-	}
 	metadata.WriteByte(version)
 
 	// Write minor version.
@@ -243,7 +244,7 @@ func (m *Meta) Build() []byte {
 	metadata.WriteByte(0x00)
 
 	// Write length.
-	length := writeLen(len(frames))
+	length := writeLen(len(frames), version)
 	metadata.Write(length)
 
 	// Write frames.
@@ -254,7 +255,7 @@ func (m *Meta) Build() []byte {
 
 
 // buildFrames builds only the frames of the episode's metadata from the internal list of id/value pairs.
-func (m *Meta) buildFrames() []byte {
+func (m *Meta) buildFrames(version byte) []byte {
 	if m == nil || !m.Buffered() {
 		return nil
 	}
@@ -270,7 +271,7 @@ func (m *Meta) buildFrames() []byte {
 		buf.WriteString(strings.ToUpper(frame.id))
 
 		// Write length. (+2 for encoding bytes around value.)
-		length := writeLen(len(frame.value) + 2)
+		length := writeLen(len(frame.value) + 2, version)
 		buf.Write(length)
 
 		// Write flags.
@@ -296,8 +297,8 @@ func (m *Meta) parseFrames() {
 	// Skip past ID.
 	buf.Next(3)
 
-	// Skip major version.
-	buf.ReadByte()
+	// Read major version.
+	version, _ := buf.ReadByte()
 
 	// Skip minor version.
 	buf.ReadByte()
@@ -309,7 +310,7 @@ func (m *Meta) parseFrames() {
 
 	// Skip past the extended header, if present.
 	if flags & (1 << 6) > 0 {
-		length := readLen(buf.Next(4))
+		length := readLen(buf.Next(4), version)
 		buf.Next(length - 4)
 	}
 
@@ -330,7 +331,7 @@ func (m *Meta) parseFrames() {
 			break
 		}
 
-		size := readLen(buf.Next(4))
+		size := readLen(buf.Next(4), version)
 		if size <= 0 {
 			Debug("Stopping frame parse early: Invalid length for", string(id), "-", size)
 			break
@@ -398,8 +399,9 @@ func (m *Meta) length() int {
 		return 0
 	}
 
-	// Skip major version.
-	if _, err := buf.ReadByte(); err != nil {
+	// Read major version.
+	version, err := buf.ReadByte()
+	if err != nil {
 		return -1
 	}
 
@@ -414,7 +416,7 @@ func (m *Meta) length() int {
 	}
 
 	// Read metadata length.
-	length := readLen(buf.Next(4))
+	length := readLen(buf.Next(4), version)
 	if length < 0 {
 		return -1
 	}
@@ -424,20 +426,27 @@ func (m *Meta) length() int {
 }
 
 
-// readLen reads a big-endian, synch-safe length out of the bytes. Synch-safe means that only the first 7 bits of each
-// byte are used for counting; the high bit is ignored.
-func readLen(buf []byte) int {
+// readLen reads a big-endian length out of the bytes. If the version is 4, then the length will be read as synch-safe
+// bytes (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored).
+func readLen(buf []byte, version byte) int {
+	width := 8
+	if version == 4 {
+		width = 7
+	}
+
 	num := int(0)
 	for _, b := range buf {
-		num <<= 7
+		num <<= width
 		num |= int(b)
 	}
 
 	return num
 }
 
-// writeLen converts the integer into a byte slice, big-endian.
-func writeLen(n int) []byte {
+// writeLen converts the integer into a byte slice, big-endian. If the version is 4, then the length will be written out
+// as synch-safe bytes (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored).
+// TODO: implement version-based length
+func writeLen(n int, version byte) []byte {
 	buf := new(bytes.Buffer)
 	for i := 0; i < 4; i++ {
 		tmp := n
