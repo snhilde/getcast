@@ -191,23 +191,26 @@ func (m *Meta) SetValue(id string, value []byte, multiple bool) {
 		return
 	}
 
-	if len(id) == 4 {
-		id = strings.ToUpper(id)
-		if !multiple {
-			// Remove all frames with matching ID.
-			var frames []Frame
-			for _, frame := range m.frames {
-				if frame.id != id {
-					frames = append(frames, frame)
-				}
-			}
-			m.frames = frames
-		}
-		m.frames = append(m.frames, Frame{id, value})
-		Debug("Set frame", id, "to", string(value))
-	} else {
+	if len(id) != 4 {
 		Debug("Invalid frame ID:", id)
+		return
 	}
+
+	id = strings.ToUpper(id)
+
+	if !multiple {
+		// Remove all frames with matching ID.
+		var frames []Frame
+		for _, frame := range m.frames {
+			if frame.id != id {
+				frames = append(frames, frame)
+			}
+		}
+		m.frames = frames
+	}
+
+	m.frames = append(m.frames, Frame{id, value})
+	Debug("Set frame", id, "to", string(value))
 }
 
 // Build constructs the metadata for the episode's file. If the metadata cannot be constructed, this will return nil.
@@ -244,7 +247,7 @@ func (m *Meta) Build() []byte {
 	metadata.WriteByte(0x00)
 
 	// Write length.
-	length := writeLen(len(frames), version)
+	length := writeLen(len(frames), version, true)
 	metadata.Write(length)
 
 	// Write frames.
@@ -271,7 +274,7 @@ func (m *Meta) buildFrames(version byte) []byte {
 		buf.WriteString(strings.ToUpper(frame.id))
 
 		// Write length. (+2 for encoding bytes around value.)
-		length := writeLen(len(frame.value) + 2, version)
+		length := writeLen(len(frame.value) + 2, version, false)
 		buf.Write(length)
 
 		// Write flags.
@@ -288,7 +291,7 @@ func (m *Meta) buildFrames(version byte) []byte {
 
 // parseFrames creates the internal list of all frames (represented as id/value pairs) in the metadata.
 func (m *Meta) parseFrames() {
-	if !m.buffered || m.readFrames {
+	if m.noMeta || !m.buffered || m.readFrames {
 		return
 	}
 
@@ -310,7 +313,7 @@ func (m *Meta) parseFrames() {
 
 	// Skip past the extended header, if present.
 	if flags & (1 << 6) > 0 {
-		length := readLen(buf.Next(4), version)
+		length := readLen(buf.Next(4), version, true)
 		buf.Next(length - 4)
 	}
 
@@ -331,7 +334,7 @@ func (m *Meta) parseFrames() {
 			break
 		}
 
-		size := readLen(buf.Next(4), version)
+		size := readLen(buf.Next(4), version, false)
 		if size <= 0 {
 			Debug("Stopping frame parse early: Invalid length for", string(id), "-", size)
 			break
@@ -416,7 +419,7 @@ func (m *Meta) length() int {
 	}
 
 	// Read metadata length.
-	length := readLen(buf.Next(4), version)
+	length := readLen(buf.Next(4), version, true)
 	if length < 0 {
 		return -1
 	}
@@ -426,12 +429,13 @@ func (m *Meta) length() int {
 }
 
 
-// readLen reads a big-endian length out of the bytes. If the version is 4, then the length will be read as synch-safe
-// bytes (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored).
-func readLen(buf []byte, version byte) int {
-	width := 8
-	if version == 4 {
-		width = 7
+// readLen reads a big-endian length out of the bytes. Header lengths are always read as synch-safe bytes (meaning that
+// only the first 7 bits of each byte are used for counting, with the high bit ignored). Frame lengths are read as
+// synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3.
+func readLen(buf []byte, version byte, header bool) int {
+	width := 7
+	if version == 3 && !header {
+		width = 8
 	}
 
 	num := int(0)
@@ -443,16 +447,22 @@ func readLen(buf []byte, version byte) int {
 	return num
 }
 
-// writeLen converts the integer into a byte slice, big-endian. If the version is 4, then the length will be written out
-// as synch-safe bytes (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored).
-// TODO: implement version-based length
-func writeLen(n int, version byte) []byte {
-	buf := new(bytes.Buffer)
-	for i := 0; i < 4; i++ {
-		tmp := n
-		tmp >>= (3 - i) * 8
-		buf.WriteByte(byte(tmp & 0xFF))
+// writeLen converts the integer into a byte slice, big-endian. Header lengths are always stored as synch-safe bytes
+// (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored). Frame lengths are
+// stored as synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3.
+func writeLen(n int, version byte, header bool) []byte {
+	width := 7
+	test := byte(0x7F)
+	if version == 3 && !header {
+		width = 8
+		test = 0xFF
 	}
 
-	return buf.Bytes()
+	buf := make([]byte, 4)
+	for i := 0; i < 4; i++ {
+		buf[3 - i] = byte(n) & test
+		n >>= width
+	}
+
+	return buf
 }
