@@ -124,6 +124,7 @@ func TestWriteMetaLocal(t *testing.T) {
 		}
 
 		// Now let's write the file to disk.
+		// TODO: this is not building the metadata, only rewriting the same data already read.
 		filepath += "_tmp"
 		if !writeData(t, file.name, filepath, meta.Bytes(), audio) {
 			continue
@@ -168,14 +169,6 @@ func TestDownload(t *testing.T) {
 		// Download only the metadata.
 		n, err := io.Copy(meta, resp.Body)
 		resp.Body.Close()
-
-		// If we read the correct amount of metadata out, then the first byte in the audio data should be 0xFF.
-		b := make([]byte, 1)
-		resp.Body.Read(b)
-		if b[0] != 0xFF {
-			t.Error(file.name, "- Audio data does not start with 0xFF")
-		}
-
 		if err != io.ErrShortWrite {
 			t.Error(file.name, "-", err)
 			continue
@@ -183,7 +176,7 @@ func TestDownload(t *testing.T) {
 			t.Error(file.name, "- Metadata sizes do not match")
 			t.Log("\tExpected:", file.metasize)
 			t.Log("\tReceived:", meta.Len())
-			// continue
+			continue
 		}
 
 		if num := checkRefFile(t, meta, file.frames); num > 0 {
