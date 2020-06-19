@@ -124,9 +124,8 @@ func TestWriteMetaLocal(t *testing.T) {
 		}
 
 		// Now let's write the file to disk.
-		// TODO: this is not building the metadata, only rewriting the same data already read.
 		filepath += "_tmp"
-		if !writeData(t, file.name, filepath, meta.Bytes(), audio) {
+		if !writeData(t, file.name, filepath, meta.Build(), audio) {
 			continue
 		}
 
