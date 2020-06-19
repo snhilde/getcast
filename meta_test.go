@@ -123,29 +123,9 @@ func TestWriteMetaLocal(t *testing.T) {
 			t.Log("\tReceived:", meta.Len())
 		}
 
-		// Now let's write the file to disk.
+		// Test writing everything to disk.
 		filepath += "_tmp"
-		if !writeData(t, file.name, filepath, meta.Build(), audio) {
-			continue
-		}
-
-		// Let's use ffprobe to see if all of the metadata was written correctly.
-		checkRefMeta(t, file.name, filepath, file.frames)
-
-		// And then do one more check with our reader.
-		meta, _, err = readAudioFile(file.path)
-		if err != nil {
-			t.Error(file.name, "-", err)
-			return
-		}
-		if num := checkRefFile(t, meta, file.frames); num > 0 {
-			t.Error(file.name, "-", num, "errors")
-		}
-
-		// Now that we're done, we can remove the temporary file.
-		if err := os.Remove(filepath); err != nil {
-			t.Error(file.name, "-", err)
-		}
+		testWrite(t, file.name, filepath, meta, audio, file.frames)
 	}
 }
 
@@ -178,8 +158,9 @@ func TestDownload(t *testing.T) {
 			continue
 		}
 
+		// Check that we read the metadata correctly.
 		if num := checkRefFile(t, meta, file.frames); num > 0 {
-			t.Error(file.name, "-", num, "errors")
+			t.Error(file.name, "-", num, "errors reading metadata")
 		}
 	}
 }
@@ -190,7 +171,7 @@ func checkRefMeta(t *testing.T, name string, filepath string, frames []refFrame)
 	// Get the frames from ffprobe's output.
 	probeMeta, err := runProbe(filepath)
 	if err != nil {
-		t.Error(name, "-", err)
+		t.Error(name, "- Error with ffprobe:", err)
 		return
 	}
 
@@ -315,6 +296,30 @@ func readAudioFile(path string) (*Meta, []byte, error) {
 	audio := data[meta.Len():]
 
 	return meta, audio, nil
+}
+
+// testWrite tests the ability to write metadata correctly.
+func testWrite(t *testing.T, name string, path string, meta *Meta, audio []byte, frames []refFrame) {
+	if !writeData(t, name, path, meta.Build(), audio) {
+		t.Error(name, "-", "Error while writing tmp file")
+	}
+
+	// Let's use ffprobe to see if all of the metadata was written correctly.
+	checkRefMeta(t, name, path, frames)
+
+	// And then do one more check with our reader.
+	newMeta, _, err := readAudioFile(path)
+	if err != nil {
+		t.Error(name, "-", err)
+	}
+	if num := checkRefFile(t, newMeta, frames); num > 0 {
+		t.Error(name, "-", num, "errors")
+	}
+
+	// Now that we're done, we can remove the temporary file.
+	if err := os.Remove(path); err != nil {
+		t.Error(name, "-", err)
+	}
 }
 
 // writeData writes the metadata and audio data to the specified file.
