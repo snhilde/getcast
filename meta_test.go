@@ -67,11 +67,25 @@ var localFiles = []refData {
 // long time and the metadata will not change.
 var onlineFiles = []refData {
 	{ "Joe Rogan", "http://traffic.libsyn.com/joeroganexp/p1000.mp3", 10 + 383990, []refFrame {
-		{ "TIT2", "title",          "#1000 - Joey Diaz & Tom Segura" },
-		{ "TPE1", "artist",         "Joe Rogan"                      },
-		{ "TPE2", "artist",         "Joe Rogan"                      },
-		{ "TALB", "album",          "The Joe Rogan Experience"       },
-		{ "TCON", "genre",          "Podcast"                        },
+		{ "TIT2", "title",          "#1000 - Joey Diaz & Tom Segura"    },
+		{ "TPE1", "artist",         "Joe Rogan"                         },
+		{ "TPE2", "artist",         "Joe Rogan"                         },
+		{ "TALB", "album",          "The Joe Rogan Experience"          },
+		{ "TCON", "genre",          "Podcast"                           },
+	} },
+	{ "NASA", "http://www.nasa.gov/sites/default/files/atoms/audio/introducingnasascuriousuniverseteaser.mp3", 10 + 26047, []refFrame {
+		{ "TYER", "year",           "2019"                              },
+		{ "TDAT", "date",           "1012",                             },
+		{ "TIME", "time",           "1538",                             },
+	} },
+	{ "The Daily", "https://rss.art19.com/episodes/ee819b27-9640-445c-8743-85b3dcec8db5.mp3", 10 + 306428, []refFrame {
+		{ "TIT2", "title",          "Our Fear Facer Makes a New Friend" },
+		{ "TPE1", "artist",         "The Daily"                         },
+		{ "TALB", "album",          "The Daily"                         },
+		{ "TCON", "genre",          "News"                              },
+		{ "TPUB", "publisher",      "The New York Times"                },
+		{ "TLAN", "language",       "English"                           },
+		{ "TENC", "encoding",       "ART19, Inc."                       },
 	} },
 }
 
