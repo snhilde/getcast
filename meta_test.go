@@ -7,8 +7,6 @@ import (
 	"os"
 	"bytes"
 	"io/ioutil"
-	"net/http"
-	"io"
 	"errors"
 )
 
@@ -73,10 +71,10 @@ var onlineFiles = []refData {
 		{ "TALB", "album",          "The Joe Rogan Experience"          },
 		{ "TCON", "genre",          "Podcast"                           },
 	} },
-	{ "NASA", "http://www.nasa.gov/sites/default/files/atoms/audio/introducingnasascuriousuniverseteaser.mp3", 10 + 26047, []refFrame {
+	{ "NASA", "https://www.nasa.gov/sites/default/files/atoms/audio/introducingnasascuriousuniverseteaser.mp3", 10 + 26047, []refFrame {
 		{ "TYER", "year",           "2019"                              },
-		{ "TDAT", "date",           "1012",                             },
-		{ "TIME", "time",           "1538",                             },
+		{ "TDAT", "date",           "1012"                              },
+		{ "TIME", "time",           "1538"                              },
 	} },
 	{ "The Daily", "https://rss.art19.com/episodes/ee819b27-9640-445c-8743-85b3dcec8db5.mp3", 10 + 306428, []refFrame {
 		{ "TIT2", "title",          "Our Fear Facer Makes a New Friend" },
@@ -131,10 +129,10 @@ func TestWriteMetaLocal(t *testing.T) {
 		}
 
 		// Check that we copied the correct amount of metadata.
-		if meta.Len() != file.metasize {
+		if len(meta.Bytes()) != file.metasize {
 			t.Error(file.name, "- Metadata sizes do not match")
 			t.Log("\tExpected:", file.metasize)
-			t.Log("\tReceived:", meta.Len())
+			t.Log("\tReceived:", len(meta.Bytes()))
 		}
 
 		// Test writing everything to disk.
@@ -146,36 +144,6 @@ func TestWriteMetaLocal(t *testing.T) {
 // Test the ability to download and save a podcast episode with the correct file information and metadata.
 func TestDownload(t *testing.T) {
 	for _, file := range onlineFiles {
-		resp, err := http.Get(file.path)
-		if err != nil {
-			t.Error(file.name, "-", err)
-			continue
-		}
-
-		if resp.StatusCode != 200 {
-			t.Error(file.name, "-", resp.Status)
-			continue
-		}
-
-		meta := NewMeta(nil)
-
-		// Download only the metadata.
-		n, err := io.Copy(meta, resp.Body)
-		resp.Body.Close()
-		if err != io.ErrShortWrite {
-			t.Error(file.name, "-", err)
-			continue
-		} else if int(n) != file.metasize {
-			t.Error(file.name, "- Metadata sizes do not match")
-			t.Log("\tExpected:", file.metasize)
-			t.Log("\tReceived:", meta.Len())
-			continue
-		}
-
-		// Check that we read the metadata correctly.
-		if num := checkRefFile(t, meta, file.frames); num > 0 {
-			t.Error(file.name, "-", num, "errors reading metadata")
-		}
 	}
 }
 
