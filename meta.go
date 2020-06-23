@@ -88,16 +88,6 @@ func (m *Meta) Write(p []byte) (int, error) {
 	return need, io.ErrShortWrite
 }
 
-// ReadFrom reads from the io.Reader into the Meta object.
-func (m *Meta) ReadFrom(r io.Reader) (int, error) {
-	if m == nil {
-		return 0, badMeta
-	}
-
-	n, err := io.Copy(m, r)
-	return int(n), err
-}
-
 // Buffered checks if all of the metadata for the episode's file has been fully buffered or not. If the file doesn't
 // have any metadata, then this will return true.
 func (m * Meta) Buffered() bool {
