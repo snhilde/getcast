@@ -44,8 +44,7 @@ func NewMeta(file []byte) *Meta {
 
 
 // Write buffers metadata into the internal buffer. When the metadata has been completely written, Write will stop
-// writing to the buffer and return (n, ErrShortWrite), with n designating how many bytes were consumed in this
-// operation.
+// writing to the buffer and return (n, io.EOF), with n designating how many bytes were consumed in this operation.
 func (m *Meta) Write(p []byte) (int, error) {
 	if m == nil {
 		return 0, badMeta
@@ -57,7 +56,7 @@ func (m *Meta) Write(p []byte) (int, error) {
 
 	if m.Buffered() {
 		// All metadata has already been written.
-		return 0, io.ErrShortWrite
+		return 0, io.EOF
 	}
 
 	// We don't know how many of the provided bytes we need to finish buffering the metadata. Let's add everything we're
@@ -85,7 +84,7 @@ func (m *Meta) Write(p []byte) (int, error) {
 	// actually need.
 	need := length - (m.buffer.Len() - len(p))
 	m.buffer.Truncate(length)
-	return need, io.ErrShortWrite
+	return need, io.EOF
 }
 
 // Buffered checks if all of the metadata for the episode's file has been fully buffered or not. If the file doesn't

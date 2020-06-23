@@ -105,7 +105,7 @@ func (e *Episode) Write(p []byte) (int, error) {
 	consumed := 0
 	if !e.meta.Buffered() {
 		// Continue buffering metadata.
-		if n, err := e.meta.Write(p); err != io.ErrShortWrite {
+		if n, err := e.meta.Write(p); err != nil && err != io.EOF {
 			// Either more data is needed or there was an error writing the metadata.
 			return n, err
 		} else {
