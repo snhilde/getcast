@@ -8,15 +8,25 @@ import (
 	"bytes"
 	"io/ioutil"
 	"errors"
+	"net/url"
+	"path"
 )
 
 
-// refData is used to hold the information about a test file on disk, including its location, metadata size, and frames.
-type refData struct {
+// localData is used to hold the information about a test file on disk, including its location, metadata size, and frames.
+type localData struct {
 	name       string
 	path       string
 	metasize   int // (header length + frames length)
 	frames   []refFrame
+}
+
+// remoteData is used to hold the information about a podcast and one specific episode.
+type remoteData struct {
+	name   string
+	url    string
+	number string
+	data   localData
 }
 
 // refFrame holds information about an individual frame in the metadata.
@@ -28,7 +38,7 @@ type refFrame struct {
 
 
 // We're going to use these generated audio files to test our ability to read metadata.
-var localFiles = []refData {
+var localFiles = []localData {
 	{ "White", "./audio/white.mp3", 10 + 291, []refFrame{
 		{ "TIT2", "title",          "White Title"                       },
 		{ "TPE1", "artist",         "White Artist"                      },
@@ -63,28 +73,42 @@ var localFiles = []refData {
 // We're going to use these podcast episodes to test our ability to download an episode and read and write the correct
 // metadata. We're going to use podcasts in which we have reasonable confidence that the files will remain online for a
 // long time and the metadata will not change.
-var onlineFiles = []refData {
-	{ "Joe Rogan", "http://traffic.libsyn.com/joeroganexp/p1000.mp3", 10 + 383990, []refFrame {
-		{ "TIT2", "title",          "#1000 - Joey Diaz & Tom Segura"    },
-		{ "TPE1", "artist",         "Joe Rogan"                         },
-		{ "TPE2", "artist",         "Joe Rogan"                         },
-		{ "TALB", "album",          "The Joe Rogan Experience"          },
-		{ "TCON", "genre",          "Podcast"                           },
-	} },
-	{ "NASA", "https://www.nasa.gov/sites/default/files/atoms/audio/introducingnasascuriousuniverseteaser.mp3", 10 + 26047, []refFrame {
-		{ "TYER", "year",           "2019"                              },
-		{ "TDAT", "date",           "1012"                              },
-		{ "TIME", "time",           "1538"                              },
-	} },
-	{ "The Daily", "https://rss.art19.com/episodes/ee819b27-9640-445c-8743-85b3dcec8db5.mp3", 10 + 306428, []refFrame {
-		{ "TIT2", "title",          "Our Fear Facer Makes a New Friend" },
-		{ "TPE1", "artist",         "The Daily"                         },
-		{ "TALB", "album",          "The Daily"                         },
-		{ "TCON", "genre",          "News"                              },
-		{ "TPUB", "publisher",      "The New York Times"                },
-		{ "TLAN", "language",       "English"                           },
-		{ "TENC", "encoding",       "ART19, Inc."                       },
-	} },
+var onlineFiles = []remoteData {
+	{ "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
+		localData { "Joe Rogan",      "#1000 - Joey Diaz & Tom Segura.mp3", 10 + 383990, []refFrame {
+			{ "TPE1", "artist",       "Joe Rogan"                          },
+			{ "TPE2", "album_artist", "Joe Rogan"                          },
+			{ "TALB", "album",        "The Joe Rogan Experience"           },
+			{ "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
+			{ "TCON", "genre",        "Podcast"                            },
+			{ "TRCK", "track",        "1000"                               },
+			{ "TDRC", "date",         "2017-08-18 23:43"                   },
+	} } },
+
+	{ "Go Time", "https://changelog.com/gotime/feed", "1",
+		localData { "Go Time", "1 - It's Go Time!.mp3", 10 + 838, []refFrame {
+			{ "TPE1", "artist",          "Changelog Media"       },
+			{ "TPE2", "album_artist",    "Changelog Media"       },
+			{ "TALB", "album",           "Go Time"               },
+			{ "TIT2", "title",           "1 - It's Go Time!.mp3" },
+			{ "TSSE", "encoder",         "Lavf56.25.101"         },
+			{ "TDES", "description",     "In this inaugural show Erik, Brian, and Carlisia kick things off by sharing some recent Go news that caught their attention, what to expect from this show, ways to get in touch, and more." },
+			{ "TCON", "genre",           "Podcast"               },
+			{ "WOAF", "url",             "https://cdn.changelog.com/uploads/gotime/1/go-time-1.mp3" },
+			{ "TPUB", "publisher",       "Changelog Media"       },
+			{ "TDRC", "date",            "2016"                  },
+			{ "PCST", "podcast episode", "1"                     },
+	} } },
+
+		// localData { "The Daily", "https://rss.art19.com/episodes/ee819b27-9640-445c-8743-85b3dcec8db5.mp3", 10 + 306428, []refFrame {
+		// { "TIT2", "title",          "Our Fear Facer Makes a New Friend" },
+		// { "TPE1", "artist",         "The Daily"                         },
+		// { "TALB", "album",          "The Daily"                         },
+		// { "TCON", "genre",          "News"                              },
+		// { "TPUB", "publisher",      "The New York Times"                },
+		// { "TLAN", "language",       "English"                           },
+		// { "TENC", "encoding",       "ART19, Inc."                       },
+	// } } },
 }
 
 
@@ -123,16 +147,16 @@ func TestWriteMetaLocal(t *testing.T) {
 			continue
 		}
 
-		// If we read the correct amount of metadata out, then the first byte in the audio data should be 0xFF.
-		if audio[0] != 0xFF {
-			t.Error(file.name, "- Audio data does not start with 0xFF")
-		}
-
 		// Check that we copied the correct amount of metadata.
 		if len(meta.Bytes()) != file.metasize {
 			t.Error(file.name, "- Metadata sizes do not match")
 			t.Log("\tExpected:", file.metasize)
 			t.Log("\tReceived:", len(meta.Bytes()))
+		}
+
+		// If we read the correct amount of metadata out, then the first byte in the audio data should be 0xFF.
+		if audio[0] != 0xFF {
+			t.Error(file.name, "- Audio data does not start with 0xFF")
 		}
 
 		// Test writing everything to disk.
@@ -143,7 +167,39 @@ func TestWriteMetaLocal(t *testing.T) {
 
 // Test the ability to download and save a podcast episode with the correct file information and metadata.
 func TestDownload(t *testing.T) {
-	for _, file := range onlineFiles {
+	for _, podcast := range onlineFiles {
+		u, err := url.Parse(podcast.url)
+		if err != nil {
+			t.Error(podcast.name, "- URL error:", err)
+			continue
+		}
+		show := Show{URL: u}
+		if n, err := show.Sync("./audio", podcast.number); err != nil {
+			t.Error(podcast.name, "- Error syncing:", err)
+		} else if n != 1 {
+			t.Error(podcast.name, "- Failed to download episode")
+		} else {
+			filepath := path.Join("./audio", podcast.name, podcast.data.path)
+			checkRefMeta(t, podcast.data.name, filepath, podcast.data.frames)
+
+			meta, audio, err := readAudioFile(filepath)
+			if err != nil {
+				t.Error(podcast.data.name, "-", err)
+				continue
+			}
+
+			// Check that we copied the correct amount of metadata.
+			if len(meta.Bytes()) != podcast.data.metasize {
+				t.Error(podcast.data.name, "- Metadata sizes do not match")
+				t.Log("\tExpected:", podcast.data.metasize)
+				t.Log("\tReceived:", len(meta.Bytes()))
+			}
+
+			// If we read the correct amount of metadata out, then the first byte in the audio data should be 0xFF.
+			if audio[0] != 0xFF {
+				t.Error(podcast.data.name, "- Audio data does not start with 0xFF")
+			}
+		}
 	}
 }
 
@@ -154,6 +210,7 @@ func checkRefMeta(t *testing.T, name string, filepath string, frames []refFrame)
 	probeMeta, err := runProbe(filepath)
 	if err != nil {
 		t.Error(name, "- Error with ffprobe:", err)
+		t.Log("\tUsed path", filepath)
 		return
 	}
 
@@ -166,12 +223,6 @@ func checkRefMeta(t *testing.T, name string, filepath string, frames []refFrame)
 			t.Log("\tFound:", have)
 		}
 		delete(probeMeta, frame.name)
-	}
-
-	// Make sure we found everything that we expected to find.
-	if len(probeMeta) != 0 {
-		t.Error(len(probeMeta), "keys remain in metadata for", name)
-		t.Log("Keys remaining:", probeMeta)
 	}
 }
 
