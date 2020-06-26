@@ -443,15 +443,15 @@ func readLen(buf []byte, version byte, header bool) int {
 // stored as synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3.
 func writeLen(n int, version byte, header bool) []byte {
 	width := 7
-	test := byte(0x7F)
+	ref := byte(0x7F)
 	if version == 3 && !header {
 		width = 8
-		test = 0xFF
+		ref = 0xFF
 	}
 
 	buf := make([]byte, 4)
 	for i := 0; i < 4; i++ {
-		buf[3 - i] = byte(n) & test
+		buf[3 - i] = byte(n) & ref
 		n >>= width
 	}
 
