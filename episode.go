@@ -105,7 +105,7 @@ func (e *Episode) Write(p []byte) (int, error) {
 	consumed := 0
 	if !e.meta.Buffered() {
 		// Continue buffering metadata.
-		if n, err := e.meta.Write(p); err != nil && err != io.EOF {
+		if n, err := e.meta.Write(p); err != io.EOF {
 			// Either more data is needed or there was an error writing the metadata.
 			return n, err
 		} else {
@@ -211,8 +211,8 @@ func (e *Episode) addFrames() {
 	}
 
 	// If the episode has an image, we'll add that. Otherwise, we'll try to get the default image of the show.
-	image := e.downloadImage()
 	if values := e.meta.GetValues("APIC"); values == nil || len(values) == 0 {
+		image := e.downloadImage()
 		e.meta.SetValue("APIC", image, false)
 	}
 }
