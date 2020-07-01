@@ -252,7 +252,7 @@ func (e *Episode) buildFilename(path string) string {
 	// Let's first check if the title contains the episode number. If it doesn't, then we want to add it so as to
 	// improve the filesystem sorting.
 	if e.Number != "" && !strings.Contains(e.Title, e.Number) {
-		e.Title = e.Number + " - " + e.Title
+		e.Title = e.Number + " " + e.Title
 	}
 
 	return filepath.Join(path, e.Title)
