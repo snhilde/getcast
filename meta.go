@@ -450,7 +450,7 @@ func writeLen(n int, version byte, header bool) []byte {
 	}
 
 	buf := make([]byte, 4)
-	for i := 0; i < 4; i++ {
+	for i := range buf {
 		buf[3 - i] = byte(n) & ref
 		n >>= width
 	}
