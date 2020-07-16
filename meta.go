@@ -367,7 +367,9 @@ func (m *Meta) parseFrames() {
 		}
 		value = bytes.TrimSuffix(value, []byte{0x00})
 
-		Debug("Found", string(id), "-", string(value))
+		if string(id) != "APIC" {
+			Debug("Found", string(id), "-", string(value))
+		}
 		m.frames = append(m.frames, Frame{string(id), value})
 	}
 }
