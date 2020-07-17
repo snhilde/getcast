@@ -75,7 +75,7 @@ var localFiles = []localData {
 // long time and the metadata will not change.
 var onlineFiles = []remoteData {
 	// { "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
-		// localData { "Joe Rogan", "#1000 Joey Diaz & Tom Segura.mp3", 10 + 383990, []refFrame {
+		// localData { "Joe Rogan", "#1000 - Joey Diaz & Tom Segura.mp3", 10 + 383990, []refFrame {
 			// { "TPE1", "artist",       "Joe Rogan"                          },
 			// { "TPE2", "album_artist", "Joe Rogan"                          },
 			// { "TALB", "album",        "The Joe Rogan Experience"           },
@@ -85,30 +85,20 @@ var onlineFiles = []remoteData {
 			// { "TDRC", "date",         "2017-08-18 23:43"                   },
 	// } } },
 
-	{ "Go Time", "https://changelog.com/gotime/feed", "1",
-		localData { "Go Time", "1 It's Go Time!.mp3", 10 + 838, []refFrame {
-			{ "TPE1", "artist",       "Changelog Media"       },
-			{ "TPE2", "album_artist", "Changelog Media"       },
-			{ "TALB", "album",        "Go Time"               },
-			{ "TIT2", "title",        "1 It's Go Time!.mp3" },
-			{ "TSSE", "encoder",      "Lavf56.25.101"         },
-			{ "TDES", "description",  "In this inaugural show Erik, Brian, and Carlisia kick things off by sharing some recent Go news that caught their attention, what to expect from this show, ways to get in touch, and more." },
-			{ "TCON", "genre",        "Podcast"               },
-			{ "TPUB", "publisher",    "Changelog Media"       },
-			{ "TDRC", "date",         "2016"                  },
-			{ "WOAF", "url",          "https://cdn.changelog.com/uploads/gotime/1/go-time-1.mp3" },
-			{ "PCST", "podcast",      "1"                     },
+	// This episode uses ID3v2.2 tags and also tests the ability to handle seasons.
+	{ "All Systems Go", "https://anchor.fm/s/f921c24/podcast/rss", "1-10",
+		localData { "All Systems Go", "func 100dofCode(Kofi host, Chris host) challengeResult -.mp3", 10 + 4086, []refFrame {
+			{ "TPE1", "artist",       "Chris Saunders"   },
+			{ "TPE2", "album_artist", "Chris Saunders"   },
+			{ "TALB", "album",        "All Systems Go"   },
+			{ "TIT2", "title",        "1-10 func 100dofCode(Kofi host, Chris host) challengeResult -.mp3" },
+			{ "TCON", "genre",        "Podcast"          },
+			{ "TPOS", "season",       "1"                },
+			{ "TRCK", "track",        "10"               },
+			{ "TDRC", "date",         "2020-01-11 05:30" },
+			{ "WOAF", "url",          "https://anchor.fm/s/f921c24/podcast/play/9620184/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fproduction%2F2020-0-11%2F42970113-44100-2-d1cd5dae3811c.mp3" },
+			{ "PCST", "podcast",      "1"                },
 	} } },
-
-		// localData { "The Daily", "https://rss.art19.com/episodes/ee819b27-9640-445c-8743-85b3dcec8db5.mp3", 10 + 306428, []refFrame {
-		// { "TIT2", "title",          "Our Fear Facer Makes a New Friend" },
-		// { "TPE1", "artist",         "The Daily"                         },
-		// { "TALB", "album",          "The Daily"                         },
-		// { "TCON", "genre",          "News"                              },
-		// { "TPUB", "publisher",      "The New York Times"                },
-		// { "TLAN", "language",       "English"                           },
-		// { "TENC", "encoding",       "ART19, Inc."                       },
-	// } } },
 }
 
 
@@ -176,6 +166,7 @@ func TestDownloadEpisode(t *testing.T) {
 		}
 
 		// Download the episode.
+		DebugMode = true
 		show := Show{URL: u}
 		if n, err := show.Sync("./tests", podcast.number); err != nil {
 			t.Error(podcast.name, "- Error syncing:", err)
