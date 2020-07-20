@@ -156,7 +156,7 @@ func (m *Meta) NumFrames() int {
 	return len(m.frames)
 }
 
-// GetValues returns all values for the given frame ID. The name will be matched in a case-sensitive comparison.
+// GetValues returns all values for the given frame ID. The ID will be matched in a case-sensitive comparison.
 func (m *Meta) GetValues(id string) [][]byte {
 	if m == nil || !m.Buffered() {
 		return nil
@@ -174,13 +174,13 @@ func (m *Meta) GetValues(id string) [][]byte {
 
 // SetValue adds the value for this frame ID into the metadata. Value should be UTF-8 encoded. If multiple is true, the
 // metadata is allowed to have multiple frames with the same frame ID. Otherwise, this frame is the only frame allowed
-// to have this frame ID.
+// to have this frame ID. ID3v2.2 frame IDs are 3 bytes long, while other versions have 4-byte IDs.
 func (m *Meta) SetValue(id string, value []byte, multiple bool) {
 	if m == nil || !m.Buffered() {
 		return
 	}
 
-	if len(id) != 4 {
+	if (m.Version() == 2 && len(id) != 3) || (m.Version() != 2 && len(id) != 4) {
 		Debug("Invalid frame ID:", id)
 		return
 	}
@@ -207,12 +207,12 @@ func (m *Meta) Build() []byte {
 	if m == nil {
 		return nil
 	}
-	Debug("Building metadata")
 
 	version := m.Version()
 	if version == 0 {
 		version = 4
 	}
+	Debug("Building metadata to version", version, "standard")
 
 	// Build out the frames first so we know how long the metadata is.
 	frames := m.buildFrames(version)
@@ -253,26 +253,49 @@ func (m *Meta) buildFrames(version byte) []byte {
 	}
 	Debug("Building metadata frames")
 
+
 	buf := new(bytes.Buffer)
 	for _, frame := range m.frames {
-		if len(frame.id) != 4 {
-			continue
+		switch version := m.Version(); version {
+		case 2:
+			// ID3v2.2 frame headers are 3-byte IDs and 3-byte lengths.
+			if len(frame.id) != 3 {
+				continue
+			}
+
+			// Write ID.
+			buf.WriteString(strings.ToUpper(frame.id))
+
+			// Write length. (+2 for encoding bytes around value.)
+			length := writeLen(len(frame.value) + 2, version, false)
+			buf.Write(length)
+
+			// Write value. 0x03 header with 0x00 footer indicates that the value is UTF-8. (We store everything as UTF-8.)
+			buf.WriteByte(0x03)
+			buf.Write(frame.value)
+			buf.WriteByte(0x00)
+
+		default:
+			// v2.3 and v2.4 frame headers are 4-byte IDs, 4-byte lengths, and 2 bytes of flags.
+			if len(frame.id) != 4 {
+				continue
+			}
+
+			// Write ID.
+			buf.WriteString(strings.ToUpper(frame.id))
+
+			// Write length. (+2 for encoding bytes around value.)
+			length := writeLen(len(frame.value) + 2, version, false)
+			buf.Write(length)
+
+			// Write flags.
+			buf.Write([]byte{0x00, 0x00})
+
+			// Write value. 0x03 header with 0x00 footer indicates that the value is UTF-8. (We store everything as UTF-8.)
+			buf.WriteByte(0x03)
+			buf.Write(frame.value)
+			buf.WriteByte(0x00)
 		}
-
-		// Write ID.
-		buf.WriteString(strings.ToUpper(frame.id))
-
-		// Write length. (+2 for encoding bytes around value.)
-		length := writeLen(len(frame.value) + 2, version, false)
-		buf.Write(length)
-
-		// Write flags.
-		buf.Write([]byte{0x00, 0x00})
-
-		// Write value. 0x03 header with 0x00 footer indicates that the value is UTF-8. (We store everything as UTF-8.)
-		buf.WriteByte(0x03)
-		buf.Write(frame.value)
-		buf.WriteByte(0x00)
 	}
 
 	return buf.Bytes()
@@ -300,51 +323,49 @@ func (m *Meta) parseFrames() {
 	// Skip past the length.
 	buf.Next(4)
 
-	// Skip past the extended header, if present.
-	if flags & (1 << 6) > 0 {
-		length := readLen(buf.Next(4), version, true)
+	// Skip past the extended header, if present (not needed for ID3v2.2).
+	if version != 2 && flags & (1 << 6) > 0 {
+		length := readLen(buf, version, true)
 		buf.Next(length - 4)
 	}
 
-	// If we encounter any error while reading the metadata, we have to bail out with what we've got, because we don't
-	// know how to continue parsing the rest of the frames. A good area for future development would be to enhance this.
+	// If we encounter any error while reading the metadata, we won't know how to continue parsing the rest of the
+	// frames and will have to bail out with what we've got. A good area for future development would be to enhance this.
 	for buf.Len() > 0 {
-		// Read frame ID. The ID must be uppercase letters or numbers.
-		id := buf.Next(4)
-		valid := true
-		for _, char := range id {
-			if char < '0' || char > 'Z' || (char > '9' && char < 'A') {
-				valid = false
-				break
-			}
-		}
-		if !valid {
+		// Read out the frame's ID.
+		id := readID(buf, version)
+		if id == nil {
 			Debug("Stopping frame parse early: Invalid frame ID")
 			break
 		}
 
-		size := readLen(buf.Next(4), version, false)
+		// Read out the frame's length.
+		size := readLen(buf, version, false)
 		if size <= 0 {
 			Debug("Stopping frame parse early: Invalid length for", string(id), "-", size)
 			break
 		}
 
-		flags := buf.Next(2)
-		if len(flags) != 2 {
-			Debug("Stopping frame parse early: Error reading frame flags")
-			break
+		// ID3v2.2 does not have flags in the frame header.
+		if version != 2 {
+			flags := buf.Next(2)
+			if len(flags) != 2 {
+				Debug("Stopping frame parse early: Error reading frame flags")
+				break
+			}
+
+			// We only want the frame if these flags are not set.
+			if flags[1] & 0x0C > 0 {
+				buf.Next(size)
+				Debug("Skipping frame")
+				continue
+			}
 		}
 
 		value := buf.Next(size)
 		if len(value) != size {
 			Debug("Stopping frame parse early: Error reading frame value")
 			break
-		}
-
-		// We only want the frame if these flags are not set.
-		if flags[1] & 0x0C > 0 {
-			Debug("Skipping frame")
-			continue
 		}
 
 		switch value[0] {
@@ -367,6 +388,7 @@ func (m *Meta) parseFrames() {
 		}
 		value = bytes.TrimSuffix(value, []byte{0x00})
 
+		// Debug print everything but the image bytes.
 		if string(id) != "APIC" {
 			Debug("Found", string(id), "-", string(value))
 		}
@@ -412,7 +434,7 @@ func (m *Meta) length() int {
 	}
 
 	// Read metadata length.
-	length := readLen(buf.Next(4), version, true)
+	length := readLen(buf, version, true)
 	if length < 0 {
 		return -1
 	}
@@ -422,17 +444,53 @@ func (m *Meta) length() int {
 }
 
 
+// readID reads the appropriate ID out of the beginning of the buffer and validates the data. This advances the buffer.
+// ID3v2.2 frame IDs are 3 bytes, while v2.3 and v2.4 frame IDs are 4 bytes.
+func readID(buf *bytes.Buffer, version byte) []byte {
+	idLen := 4
+	if version == 2 {
+		idLen = 3
+	}
+
+	// Read out the id bytes, and make sure all the bytes are there.
+	id := buf.Next(idLen)
+	if len(id) != idLen {
+		return nil
+	}
+
+	// Frame IDs can be numbers and uppercase letters.
+	for _, char := range id {
+		if char < '0' || char > 'Z' || (char > '9' && char < 'A') {
+			return nil
+		}
+	}
+
+	return id
+}
+
 // readLen reads a big-endian length out of the bytes. Header lengths are always read as synch-safe bytes (meaning that
 // only the first 7 bits of each byte are used for counting, with the high bit ignored). Frame lengths are read as
-// synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3.
-func readLen(buf []byte, version byte, header bool) int {
+// synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3. Additionally, ID3v2.2 frame lengths are only 3
+// bytes long.
+func readLen(buf *bytes.Buffer, version byte, header bool) int {
+	bufLen := 4
+	if version == 2 && !header {
+		bufLen = 3
+	}
+
+	// Read out the length bytes, and make sure all the bytes were there.
+	bytes := buf.Next(bufLen)
+	if len(bytes) != bufLen {
+		return -1
+	}
+
 	width := 7
 	if version == 3 && !header {
 		width = 8
 	}
 
 	num := int(0)
-	for _, b := range buf {
+	for _, b := range bytes {
 		num <<= width
 		num |= int(b)
 	}
@@ -442,19 +500,26 @@ func readLen(buf []byte, version byte, header bool) int {
 
 // writeLen converts the integer into a byte slice, big-endian. Header lengths are always stored as synch-safe bytes
 // (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored). Frame lengths are
-// stored as synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3.
+// stored as synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3. Additionally, ID3v2.2 frame lengths are
+// only 3 bytes long.
 func writeLen(n int, version byte, header bool) []byte {
-	width := 7
-	ref := byte(0x7F)
-	if version == 3 && !header {
-		width = 8
-		ref = 0xFF
+	bufLen := 4
+	shiftWidth := 7
+	refByte := byte(0x7F)
+
+	if version == 2 && !header {
+		bufLen = 3
 	}
 
-	buf := make([]byte, 4)
+	if version == 3 && !header {
+		shiftWidth = 8
+		refByte = 0xFF
+	}
+
+	buf := make([]byte, bufLen)
 	for i := range buf {
-		buf[3 - i] = byte(n) & ref
-		n >>= width
+		buf[bufLen - 1 - i] = byte(n) & refByte
+		n >>= shiftWidth
 	}
 
 	return buf
