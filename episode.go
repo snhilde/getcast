@@ -158,62 +158,86 @@ func (e *Episode) SetShowImage(image string) {
 func (e *Episode) addFrames() {
 	Debug("Building metadata frames")
 
-	frames := []struct {
-		id    string
-		value string
-	}{
-		// Show information
-		{ "TPE1", e.showArtist    }, // Artist
-		{ "TPE2", e.showArtist    }, // Album Artist
+	version := e.meta.Version()
 
-		// Episode information
-		{ "TRCK", e.Number        },
-		{ "TDES", e.Desc          },
-		{ "TPOS", e.Season        },
-		{ "WOAF", e.Enclosure.URL },
-
-		// Defaults
-		{ "TCON", "Podcast"       },
-		{ "PCST", "1"             },
+	// We always want the show and episode titles to match the contents of the RSS feed.
+	switch version {
+	case 2:
+		e.meta.SetValue("TAL", []byte(e.showTitle), false)
+		e.meta.SetValue("TT2", []byte(e.Title), false)
+	case 3:
+		fallthrough
+	case 4:
+		e.meta.SetValue("TALB", []byte(e.showTitle), false)
+		e.meta.SetValue("TIT2", []byte(e.Title), false)
+	default:
+		Debug("Version", version, "is not currently supported")
+		return
 	}
 
-	// Set these frames from the table above.
-	for _, frame := range frames {
-		if values := e.meta.GetValues(frame.id); values == nil || len(values) == 0 {
-			e.meta.SetValue(frame.id, []byte(frame.value), false)
+	ts := time.Now()
+	if e.Date != "" {
+		if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
+			ts = t
 		}
 	}
 
-	// We always want the show and episode titles to match the contents of the RSS feed.
-	e.meta.SetValue("TALB", []byte(e.showTitle), false)
-	e.meta.SetValue("TIT2", []byte(e.Title), false)
+	frames := []struct {
+		idv2  string // ID3v2.2 frame ID
+		idv3  string // ID3v2.3 frame ID
+		idv4  string // ID3v2.4 frame ID
+		value string
+	}{
+		// Show information
+		{ "TP1", "TPE1", "TPE1", e.showArtist                   }, // Artist
+		{ "TP2", "TPE2", "TPE2", e.showArtist                   }, // Album Artist
 
-	// We have to manually add the date and format it according the ID3v2 version we're using.
-	if e.Date != "" {
-		if time, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
-			switch e.meta.Version() {
-			case 3:
-				if values := e.meta.GetValues("TYER"); values == nil || len(values) == 0 {
-					e.meta.SetValue("TYER", []byte(time.Format("2006")), false) // YYYY
-				}
-				if values := e.meta.GetValues("TDAT"); values == nil || len(values) == 0 {
-					e.meta.SetValue("TDAT", []byte(time.Format("0201")), false) // DDMM
-				}
-				if values := e.meta.GetValues("TIME"); values == nil || len(values) == 0 {
-					e.meta.SetValue("TIME", []byte(time.Format("1504")), false) // HHMM
-				}
-			case 4:
-				if values := e.meta.GetValues("TDRC"); values == nil || len(values) == 0 {
-					e.meta.SetValue("TDRC", []byte(time.Format("20060102T150405")), false) // YYYYMMDDTHHMMSS
-				}
-			}
+		// Episode information
+		{ "TPA", "TPOS", "TPOS", e.Season                       },
+		{ "TRK", "TRCK", "TRCK", e.Number                       },
+		{ "TT3", "TDES", "TDES", e.Desc                         },
+		{ "WAF", "WOAF", "WOAF", e.Enclosure.URL                },
+
+		// Dates
+		{ "TYE", "TYER", "",     ts.Format("2006")            }, // YYYY
+		{ "TDA", "TDAT", "",     ts.Format("0201")            }, // DDMM
+		{ "TIM", "TIME", "",     ts.Format("1504")            }, // HHMM
+		{ "",    "",     "TDRC", ts.Format("20060102T150405") }, // YYYYMMDDTHHMMSS
+
+		// Defaults
+		{ "TT1", "TCON", "TCON", "Podcast"                      },
+		{ "",    "PCST", "PCST", "1"                            },
+	}
+
+	// Set these frames from the table above if a value is not already present.
+	for _, frame := range frames {
+		var id string
+		switch version := e.meta.Version(); version {
+		case 2:
+			id = frame.idv2
+		case 3:
+			id = frame.idv3
+		case 4:
+			id = frame.idv4
+		}
+
+		if id == "" || frame.value == "" {
+			continue
+		}
+
+		if values := e.meta.GetValues(id); values == nil || len(values) == 0 {
+			e.meta.SetValue(id, []byte(frame.value), false)
 		}
 	}
 
 	// If the episode has an image, we'll add that. Otherwise, we'll try to get the default image of the show.
-	if values := e.meta.GetValues("APIC"); values == nil || len(values) == 0 {
+	imageID := "APIC"
+	if version == 2 {
+		imageID = "PIC"
+	}
+	if values := e.meta.GetValues(imageID); values == nil || len(values) == 0 {
 		image := e.downloadImage()
-		e.meta.SetValue("APIC", image, false)
+		e.meta.SetValue(imageID, image, false)
 	}
 }
 
