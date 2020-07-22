@@ -73,17 +73,18 @@ var localFiles = []localData {
 // metadata. We're going to use podcasts in which we have reasonable confidence that the files will remain online for a
 // long time and the metadata will not change.
 var onlineFiles = []remoteData {
+	// This episode uses ID3v2.3 tags.
 	// The pubDate for this episode ends in "+0000".
-	{ "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
-		localData { "Joe Rogan", "#1000 - Joey Diaz & Tom Segura.mp3", -1, []refFrame {
-			{ "TPE1", "artist",       "Joe Rogan"                          },
-			{ "TPE2", "album_artist", "Joe Rogan"                          },
-			{ "TALB", "album",        "The Joe Rogan Experience"           },
-			{ "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
-			{ "TCON", "genre",        "Podcast"                            },
-			{ "TRCK", "track",        "1000"                               },
-			{ "TDRC", "date",         "2017-08-18 23:43"                   },
-	} } },
+	// { "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
+		// localData { "Joe Rogan", "#1000 - Joey Diaz & Tom Segura.mp3", -1, []refFrame {
+			// { "TPE1", "artist",       "Joe Rogan"                          },
+			// { "TPE2", "album_artist", "Joe Rogan"                          },
+			// { "TALB", "album",        "The Joe Rogan Experience"           },
+			// { "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
+			// { "TCON", "genre",        "Podcast"                            },
+			// { "TRCK", "track",        "1000"                               },
+			// { "TDRC", "date",         "2017-08-18 23:43"                   },
+	// } } },
 
 	// This episode uses ID3v2.2 tags and also tests the ability to handle seasons.
 	// The pubDate for this episode ends in "GMT".
