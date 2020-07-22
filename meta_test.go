@@ -7,7 +7,6 @@ import (
 	"os"
 	"bytes"
 	"io/ioutil"
-	"errors"
 	"net/url"
 	"path"
 )
@@ -74,30 +73,34 @@ var localFiles = []localData {
 // metadata. We're going to use podcasts in which we have reasonable confidence that the files will remain online for a
 // long time and the metadata will not change.
 var onlineFiles = []remoteData {
-	// { "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
-		// localData { "Joe Rogan", "#1000 - Joey Diaz & Tom Segura.mp3", 10 + 383990, []refFrame {
-			// { "TPE1", "artist",       "Joe Rogan"                          },
-			// { "TPE2", "album_artist", "Joe Rogan"                          },
-			// { "TALB", "album",        "The Joe Rogan Experience"           },
-			// { "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
-			// { "TCON", "genre",        "Podcast"                            },
-			// { "TRCK", "track",        "1000"                               },
-			// { "TDRC", "date",         "2017-08-18 23:43"                   },
-	// } } },
+	// The pubDate for this episode ends in "+0000".
+	{ "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
+		localData { "Joe Rogan", "#1000 - Joey Diaz & Tom Segura.mp3", -1, []refFrame {
+			{ "TPE1", "artist",       "Joe Rogan"                          },
+			{ "TPE2", "album_artist", "Joe Rogan"                          },
+			{ "TALB", "album",        "The Joe Rogan Experience"           },
+			{ "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
+			{ "TCON", "genre",        "Podcast"                            },
+			{ "TRCK", "track",        "1000"                               },
+			{ "TDRC", "date",         "2017-08-18 23:43"                   },
+	} } },
 
 	// This episode uses ID3v2.2 tags and also tests the ability to handle seasons.
+	// The pubDate for this episode ends in "GMT".
 	{ "All Systems Go", "https://anchor.fm/s/f921c24/podcast/rss", "1-10",
-		localData { "All Systems Go", "func 100dofCode(Kofi host, Chris host) challengeResult -.mp3", 10 + 4086, []refFrame {
-			{ "TPE1", "artist",       "Chris Saunders"   },
-			{ "TPE2", "album_artist", "Chris Saunders"   },
-			{ "TALB", "album",        "All Systems Go"   },
-			{ "TIT2", "title",        "1-10 func 100dofCode(Kofi host, Chris host) challengeResult -.mp3" },
-			{ "TCON", "genre",        "Podcast"          },
-			{ "TPOS", "season",       "1"                },
-			{ "TRCK", "track",        "10"               },
-			{ "TDRC", "date",         "2020-01-11 05:30" },
-			{ "WOAF", "url",          "https://anchor.fm/s/f921c24/podcast/play/9620184/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fproduction%2F2020-0-11%2F42970113-44100-2-d1cd5dae3811c.mp3" },
-			{ "PCST", "podcast",      "1"                },
+		localData { "All Systems Go", "func 100dofCode(Kofi host, Chris host) challengeResult {.mp3", -1, []refFrame {
+			{ "TP1", "artist",       "Chris Saunders"     },
+			{ "TP2", "album_artist", "Chris Saunders"     },
+			{ "TAL", "album",        "All Systems Go"     },
+			{ "TT2", "title",        "1-10 func 100dofCode(Kofi host, Chris host) challengeResult {.mp3" },
+			{ "TT1", "genre",        "Podcast"            },
+			{ "TPA", "season",       "1"                  },
+			{ "TRK", "track",        "10"                 },
+			{ "TYE", "year",         "2020"               },
+			{ "TDA", "date",         "1101"               },
+			{ "TIM", "time",         "0530"               },
+			{ "WAF", "url",          "https://anchor.fm/s/f921c24/podcast/play/9620184/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fproduction%2F2020-0-11%2F42970113-44100-2-d1cd5dae3811c.mp3" },
+			{ "TSS", "",             "Logic Pro X 10.4.8" },
 	} } },
 }
 
@@ -125,8 +128,7 @@ func TestReadMeta(t *testing.T) {
 	}
 }
 
-// Test the ability to write metadata and files correctly. The files to copy and write are the same files in
-// TestReadMeta.
+// Test the ability to write metadata and files correctly. The files to copy and write are the same files in TestReadMeta.
 func TestWriteMeta(t *testing.T) {
 	// Read the reference files into memory and write them back out. If they're equal, then the write
 	// operation is good.
@@ -166,61 +168,82 @@ func TestDownloadEpisode(t *testing.T) {
 		}
 
 		// Download the episode.
-		DebugMode = true
 		show := Show{URL: u}
 		if n, err := show.Sync("./tests", podcast.number); err != nil {
 			t.Error(podcast.name, "- Error syncing:", err)
 			continue
 		} else if n != 1 {
-			t.Error(podcast.name, "- Downloaded", n, "episodes")
+			t.Error(podcast.name, "- Downloaded", n, "episodes (expected 1)")
 			continue
 		}
 
-		// Check that we have the correct metadata.
 		filepath := path.Join("./tests", podcast.name, podcast.data.path)
-		probeMeta(t, podcast.data.name, filepath, podcast.data.frames)
-		continue // TODO
-
 		meta, audio, err := splitFile(filepath)
 		if err != nil {
 			t.Error(podcast.data.name, "-", err)
 			continue
 		}
 
-		// Check that we copied the correct amount of metadata.
-		if len(meta.Bytes()) != podcast.data.metasize {
-			t.Error(podcast.data.name, "- Metadata sizes do not match")
-			t.Log("\tExpected:", podcast.data.metasize)
-			t.Log("\tReceived:", len(meta.Bytes()))
-		}
-
 		// If we read the correct amount of metadata out, then the first byte in the audio data should be 0xFF.
 		if audio[0] != 0xFF {
 			t.Error(podcast.data.name, "- Audio data does not start with 0xFF")
+			continue
+		}
+
+		// Check that we have the correct metadata.
+		if num := readMeta(t, meta, podcast.data.frames); num > 0 {
+			t.Error(podcast.data.name, "-", num, "errors")
+			continue
 		}
 	}
 }
 
 
-// probeMeta compares the metadata of a file using ffprobe to the expected metadata in the file table.
+// probeMeta compares the metadata of a file using ffprobe to the expected metadata in the file table. This runs ffprobe
+// on the specified file and reads the metadata as key/value pairs. Note that ffprobe does not return the actual tag
+// name; it returns a human-readable format. For example, it returns "title" instead of "TIT2".
 func probeMeta(t *testing.T, name string, filepath string, frames []refFrame) {
 	// Get the frames from ffprobe's output.
-	probed, err := runProbe(filepath)
+	cmd := exec.Command("ffprobe", "-hide_banner", filepath)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Error(name, "- Error with ffprobe:", err)
 		t.Log("\tUsed path", filepath)
 		return
 	}
 
+	// To find our metadata, we're going to read everything between the header (Metadata:) and trailer (Duration:).
+	start := false
+	probedMeta := make(map[string]string)
+
+	lines := strings.Split(string(output), "\n")
+	for _, v := range lines {
+		if strings.Contains(v, "Metadata:") {
+			start = true
+		} else if strings.Contains(v, "Duration:") {
+			break
+		} else if start {
+			fields := strings.SplitN(v, ":", 2)
+			id := strings.TrimSpace(fields[0])
+			value := strings.TrimSpace(fields[1])
+			probedMeta[id] = value
+		}
+	}
+
+	if len(probedMeta) == 0 {
+		t.Error(name, "- ffprobe didn't read any metadata")
+		return
+	}
+
 	for _, frame := range frames {
 		want := frame.value
-		have := probed[frame.name]
+		have := probedMeta[frame.name]
 		if want != have {
-			t.Error(name, "- Values do not match for id:", frame.name, "/", frame.id)
-			t.Log("\tExpected:", want)
-			t.Log("\tFound:", have)
+			t.Error(name, "- Values do not match for frame " + frame.id + " (" + frame.name + ")")
+			t.Log("\tWant:", want)
+			t.Log("\tHave:", have)
 		}
-		delete(probed, frame.name)
+		delete(probedMeta, frame.name)
 	}
 }
 
@@ -242,7 +265,7 @@ func readMeta(t *testing.T, meta *Meta, frames []refFrame) int {
 
 		for _, value := range values {
 			switch frame.id {
-			case "COMM":
+			case "COM", "COMM":
 				// If this frame is present, then there are usually 2 instances of it: one that starts with 3 null
 				// bytes, and one that starts with three 'X' bytes. Either way, the next byte is a null separator
 				// followed by the value.
@@ -250,7 +273,7 @@ func readMeta(t *testing.T, meta *Meta, frames []refFrame) int {
 				if strings.TrimSpace(string(value)) == frame.value {
 					found = true
 				}
-			case "TXXX":
+			case "TXX", "TXXX":
 				// This is the user-defined field. The frame name and frame value are separated by a null byte.
 				fields := bytes.SplitN(value, []byte{0x00}, 2)
 				if len(fields) == 2 && string(fields[0]) == frame.name && string(fields[1]) == frame.value {
@@ -269,65 +292,17 @@ func readMeta(t *testing.T, meta *Meta, frames []refFrame) int {
 
 		if !found {
 			numErrors++
-			t.Error(errors.New("Value not found for frame id " + frame.id + " (" + frame.name + ")"))
+			t.Error("Values do not match for frame " + frame.id + " (" + frame.name + ")")
+			t.Log("\tWant:", frame.value)
+			for _, value := range values {
+				t.Log("\tHave:", string(value))
+			}
 		}
 	}
 
 	return numErrors
 }
 
-
-// runProbe runs ffprobe on the specified file and returns the metadata read as key/value pairs. Note that ffprobe does
-// not return the actual tag name; it returns a human-readable format. For example, it returns "title" instead of "TIT2".
-func runProbe(path string) (map[string]string, error) {
-	cmd := exec.Command("ffprobe", "-hide_banner", path)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-
-	// To find our metadata, we're going to read everything between the header (Metadata:) and trailer (Duration:).
-	start := false
-	meta := make(map[string]string)
-
-	lines := strings.Split(string(output), "\n")
-	for _, v := range lines {
-		if strings.Contains(v, "Metadata:") {
-			start = true
-		} else if strings.Contains(v, "Duration:") {
-			break
-		} else if start {
-			fields := strings.SplitN(v, ":", 2)
-			id := strings.TrimSpace(fields[0])
-			value := strings.TrimSpace(fields[1])
-			meta[id] = value
-		}
-	}
-
-	return meta, nil
-}
-
-// splitFile reads the data from the audio file and splits it into metadata and audio data.
-func splitFile(path string) (*Meta, []byte, error) {
-	// Open the reference file.
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Get all the data from the file.
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer file.Close()
-
-	// Copy the metadata and the rest of the file.
-	meta := NewMeta(data)
-	audio := data[meta.Len():]
-
-	return meta, audio, nil
-}
 
 // testWrite tests the ability to write metadata correctly.
 func testWrite(t *testing.T, name string, path string, meta *Meta, audio []byte, frames []refFrame) {
@@ -385,4 +360,23 @@ func writeData(t *testing.T, name string, filepath string, meta, audio []byte) b
 	}
 
 	return true
+}
+
+// splitFile reads the data from the audio file and splits it into metadata and audio data.
+func splitFile(path string) (*Meta, []byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	meta := NewMeta(data)
+	audio := data[meta.Len():]
+
+	return meta, audio, nil
 }
