@@ -165,9 +165,7 @@ func (e *Episode) addFrames() {
 	case 2:
 		e.meta.SetValue("TAL", []byte(e.showTitle), false)
 		e.meta.SetValue("TT2", []byte(e.Title), false)
-	case 3:
-		fallthrough
-	case 4:
+	case 3, 4:
 		e.meta.SetValue("TALB", []byte(e.showTitle), false)
 		e.meta.SetValue("TIT2", []byte(e.Title), false)
 	default:
@@ -175,12 +173,7 @@ func (e *Episode) addFrames() {
 		return
 	}
 
-	ts := time.Now()
-	if e.Date != "" {
-		if t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", e.Date); err == nil {
-			ts = t
-		}
-	}
+	ts := parseDate(e.Date)
 
 	frames := []struct {
 		idv2  string // ID3v2.2 frame ID
@@ -280,6 +273,29 @@ func (e *Episode) buildFilename(path string) string {
 	}
 
 	return filepath.Join(path, e.Title)
+}
+
+// parseDate parses the provided publish date and converts it into a timestamp.
+func parseDate(date string) time.Time {
+	if date == "" {
+		return time.Time{}
+	}
+
+	formats := []string{
+		"Mon, 02 Jan 2006 15:04:05 -0700",
+		"Mon, 02 Jan 2006 15:04:05 MST",
+	}
+	for i, format := range formats {
+		if ts, err := time.Parse(format, date); err != nil {
+			Debug("Error parsing time with format", i, "-", err)
+		} else {
+			return ts
+		}
+	}
+
+	// If we're here, then none of the formats worked.
+	Debug("Failed to match format to date:", date)
+	return time.Time{}
 }
 
 // downloadImage downloads either the episode (preferred) or show (fallback) image. If no link exists or there's any
