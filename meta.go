@@ -298,6 +298,10 @@ func (m *Meta) buildFrames(version byte) []byte {
 		}
 	}
 
+	if buf.Len() == 0 {
+		return nil
+	}
+
 	return buf.Bytes()
 }
 
