@@ -217,7 +217,7 @@ func (m *Meta) Build() []byte {
 	// Build out the frames first so we know how long the metadata is.
 	frames := m.buildFrames(version)
 	if frames == nil {
-		Debug("No track information exists")
+		Debug("No metadata frames available")
 		return nil
 	}
 
