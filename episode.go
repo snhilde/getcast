@@ -265,14 +265,18 @@ func (e *Episode) validateData() error {
 }
 
 // buildFilename pieces together the different components of the episode into one absolute-path filename.
+// TODO: Right now, we are always adding a season/episode prefix. A good area of future development would be to make
+// this more intelligent so that it's only added when it doesn't already exist in the title.
 func (e *Episode) buildFilename(path string) string {
-	// Let's first check if the title contains the episode number. If it doesn't, then we want to add it so as to
-	// improve the filesystem sorting.
-	if e.Number != "" && !strings.Contains(e.Title, e.Number) {
-		e.Title = e.Number + " " + e.Title
+	base := e.Title
+	if e.Number != "" {
+		base = e.Number + " " + base
+		if e.Season != "" {
+			base = e.Season + "-" + base
+		}
 	}
 
-	return filepath.Join(path, e.Title)
+	return filepath.Join(path, base)
 }
 
 // parseDate parses the provided publish date and converts it into a timestamp.
