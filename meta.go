@@ -330,7 +330,9 @@ func (m *Meta) parseFrames() {
 	}
 
 	// If we encounter any error while reading the metadata, we won't know how to continue parsing the rest of the
-	// frames and will have to bail out with what we've got. A good area for future development would be to enhance this.
+	// frames and will have to bail out with what we've got.
+	// TODO: A good area for future development would be to enhance this, perhaps by trying to continue on until the
+	// next tag is found.
 	for buf.Len() > 0 {
 		// Read out the frame's ID.
 		id := readID(buf, version)
