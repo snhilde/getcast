@@ -122,6 +122,12 @@ func (e *Episode) Write(p []byte) (int, error) {
 		} else if n != len(metadata) {
 			return consumed, fmt.Errorf("Failed to write complete metadata")
 		}
+
+		// Metadata has been written. At this point, the next bytes are audio data. Let's do a quick sanity check that
+		// they start with 0x00 like they should.
+		if consumed < len(p) && p[consumed] != 0x00 {
+			Debug("Possible data corruption: Audio data does not start with 0x00")
+		}
 	}
 
 	// If we're here, then all metadata has been successfully written. We can resume with writing the file data now.
