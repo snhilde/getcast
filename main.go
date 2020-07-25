@@ -6,6 +6,7 @@ import (
 	"os"
 	"net/url"
 	"strings"
+	"path"
 )
 
 var (
