@@ -75,25 +75,27 @@ var localFiles = []localData {
 var onlineFiles = []remoteData {
 	// This episode uses ID3v2.3 tags.
 	// The pubDate for this episode ends in "+0000".
-	// { "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
-		// localData { "Joe Rogan", "#1000 - Joey Diaz & Tom Segura.mp3", -1, []refFrame {
-			// { "TPE1", "artist",       "Joe Rogan"                          },
-			// { "TPE2", "album_artist", "Joe Rogan"                          },
-			// { "TALB", "album",        "The Joe Rogan Experience"           },
-			// { "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
-			// { "TCON", "genre",        "Podcast"                            },
-			// { "TRCK", "track",        "1000"                               },
-			// { "TDRC", "date",         "2017-08-18 23:43"                   },
-	// } } },
+	{ "The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
+		localData { "Joe Rogan", "1000 #1000 - Joey Diaz & Tom Segura.mp3", -1, []refFrame {
+			{ "TPE1", "artist",       "Joe Rogan"                          },
+			{ "TPE2", "album_artist", "Joe Rogan"                          },
+			{ "TALB", "album",        "The Joe Rogan Experience"           },
+			{ "TIT2", "title",        "#1000 - Joey Diaz & Tom Segura.mp3" },
+			{ "TCON", "genre",        "Podcast"                            },
+			{ "TRCK", "track",        "1000"                               },
+			{ "TYER", "year",         "2017"                               },
+			{ "TDAT", "date",         "1808"                               },
+			{ "TIME", "time",         "2343"                               },
+	} } },
 
 	// This episode uses ID3v2.2 tags and also tests the ability to handle seasons.
 	// The pubDate for this episode ends in "GMT".
 	{ "All Systems Go", "https://anchor.fm/s/f921c24/podcast/rss", "1-10",
-		localData { "All Systems Go", "func 100dofCode(Kofi host, Chris host) challengeResult {.mp3", -1, []refFrame {
+		localData { "All Systems Go", "1-10 func 100dofCode(Kofi host, Chris host) challengeResult {.mp3", -1, []refFrame {
 			{ "TP1", "artist",       "Chris Saunders"     },
 			{ "TP2", "album_artist", "Chris Saunders"     },
 			{ "TAL", "album",        "All Systems Go"     },
-			{ "TT2", "title",        "1-10 func 100dofCode(Kofi host, Chris host) challengeResult {.mp3" },
+			{ "TT2", "title",        "func 100dofCode(Kofi host, Chris host) challengeResult {.mp3" },
 			{ "TT1", "genre",        "Podcast"            },
 			{ "TPA", "season",       "1"                  },
 			{ "TRK", "track",        "10"                 },
