@@ -43,13 +43,14 @@ func main() {
 	show := Show{URL: u}
 
 	// Validate (or create) the download directory.
-	if *dirArg == "" {
+	dir := path.Clean(*dirArg)
+	if dir == "" {
 		fmt.Println("No download directory specified")
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	if err := ValidateDir(*dirArg); err != nil {
+	if err := ValidateDir(dir); err != nil {
 		fmt.Println(err)
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
@@ -57,7 +58,7 @@ func main() {
 	}
 
 	// And sync the show.
-	n, err := show.Sync(*dirArg, *numArg)
+	n, err := show.Sync(dir, *numArg)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
