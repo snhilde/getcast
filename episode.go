@@ -158,7 +158,11 @@ func (e *Episode) SetShowImage(image string) {
 func (e *Episode) addFrames() {
 	Debug("Building metadata frames")
 
+	// Get the version, defaulting to ID3v2.3.
 	version := e.meta.Version()
+	if version == 0 {
+		version = 3
+	}
 
 	// We always want the show and episode titles to match the contents of the RSS feed.
 	switch version {
