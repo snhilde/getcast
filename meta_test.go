@@ -144,7 +144,7 @@ func TestWriteMeta(t *testing.T) {
 		}
 
 		// Check that we copied the correct amount of metadata.
-		if len(meta.Bytes()) != file.metasize {
+		if file.metasize > 0 && len(meta.Bytes()) != file.metasize {
 			t.Error(file.name, "- Metadata sizes do not match")
 			t.Log("\tExpected:", file.metasize)
 			t.Log("\tReceived:", len(meta.Bytes()))
