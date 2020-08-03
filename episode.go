@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"net/url"
 	"io/ioutil"
+	"bytes"
 )
 
 
@@ -240,7 +241,9 @@ func (e *Episode) addFrames() {
 	}
 	if values := e.meta.GetValues(imageID); values == nil || len(values) == 0 {
 		image := e.downloadImage()
-		e.meta.SetValue(imageID, image, false)
+		if image != nil {
+			e.meta.SetValue(imageID, image, false)
+		}
 	}
 }
 
@@ -312,8 +315,8 @@ func parseDate(date string) time.Time {
 	return time.Time{}
 }
 
-// downloadImage downloads either the episode (preferred) or show (fallback) image. If no link exists or there's any
-// trouble downloading the image, this return nil.
+// downloadImage downloads either the episode (preferred) or show (fallback) image and build the APIC tag with the data.
+// If no link exists or there's any trouble downloading the image, this return nil.
 func (e *Episode) downloadImage() []byte {
 	if e == nil {
 		return nil
@@ -354,7 +357,20 @@ func (e *Episode) downloadImage() []byte {
 		return nil
 	}
 
-	return data
+	buf := new(bytes.Buffer)
+	// MIME type. We are going to explicitly not set this so that the image can set its own type internally.
+	buf.WriteByte(0x00)
+
+	// Picture type (hardcoded as "Cover (front)")
+	buf.WriteByte(0x03)
+
+	// Description (skipped)
+	buf.WriteByte(0x00)
+
+	// Picture data
+	buf.Write(data)
+
+	return buf.Bytes()
 }
 
 
