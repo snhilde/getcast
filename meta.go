@@ -1,3 +1,4 @@
+// For specifications on the 3 ID3 standards: https://id3.org/Developer%20Information
 package main
 
 import (
