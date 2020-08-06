@@ -29,7 +29,7 @@ type Show struct {
 func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	resp, err := http.Get(s.URL.String())
 	if err != nil {
-		return 0, fmt.Errorf("Invalid RSS feed: %v", err)
+		return 0, fmt.Errorf("Error getting RSS feed: %v", err)
 	}
 	defer resp.Body.Close()
 
