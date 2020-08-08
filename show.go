@@ -128,7 +128,7 @@ func (s *Show) filter(specificEp string) error {
 
 		// Build the metadata object so we can inspect the tag contents.
 		meta := NewMeta(nil)
-		if _, err := io.Copy(meta, file); err != nil && err != io.ErrShortWrite {
+		if _, err := io.Copy(meta, file); err != nil && err != io.EOF {
 			return err
 		}
 
