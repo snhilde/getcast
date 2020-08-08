@@ -89,8 +89,10 @@ func (e *Episode) Download(showDir string) error {
 	Debug("Beginning download process")
 	_, err = io.Copy(e, tee)
 	if err != nil {
+		Debug("I/O Copy error:", err)
 		return err
 	}
+	Debug("I/O Copy successful")
 
 	return bar.Finish()
 }
