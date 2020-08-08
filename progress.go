@@ -60,9 +60,9 @@ func (pr *Progress) Finish() error {
 	if pr.have != pr.total {
 		Debug("Expected", pr.total, "bytes, Received", pr.have, "bytes")
 		if pr.have < pr.total {
-			Debug("Failed to download entire episode")
+			fmt.Println("Failed to download entire episode")
 		} else {
-			Debug("Downloaded more bytes than expected")
+			fmt.Println("Downloaded more bytes than expected")
 		}
 		return errDownload
 	}
