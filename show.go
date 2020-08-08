@@ -132,10 +132,14 @@ func (s *Show) filter(specificEp string) error {
 		defer file.Close()
 
 		// Build the metadata object so we can inspect the tag contents.
+		// (We're temporarily turning off Debug Mode so we don't spam print all the metadata frames.)
+		tmpDebug := DebugMode
+		DebugMode = false
 		meta := NewMeta(nil)
 		if _, err := io.Copy(meta, file); err != nil && err != io.EOF {
 			return err
 		}
+		DebugMode = tmpDebug
 
 		// We only want episodes from this show.
 		id := ""
