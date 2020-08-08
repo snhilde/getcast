@@ -64,11 +64,13 @@ func (e *Episode) Download(showDir string) error {
 
 	resp, err := http.Get(e.Enclosure.URL)
 	if err != nil {
+		os.Remove(filename)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		os.Remove(filename)
 		return fmt.Errorf("%v", resp.Status)
 	}
 
@@ -90,9 +92,9 @@ func (e *Episode) Download(showDir string) error {
 	_, err = io.Copy(e, tee)
 	if err != nil {
 		Debug("I/O Copy error:", err)
+		os.Remove(filename)
 		return err
 	}
-	Debug("I/O Copy successful")
 
 	return bar.Finish()
 }
