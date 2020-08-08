@@ -171,23 +171,17 @@ func (e *Episode) addFrames() {
 
 	// Get the version, defaulting to ID3v2.3.
 	version := e.meta.Version()
-	if version == 0 {
-		version = 3
-	}
-
-	// We always want the show and episode titles to match the contents of the RSS feed.
 	switch version {
-	case 2:
-		e.meta.SetValue("TAL", []byte(e.showTitle), false)
-		e.meta.SetValue("TT2", []byte(e.Title), false)
-	case 3, 4:
-		e.meta.SetValue("TALB", []byte(e.showTitle), false)
-		e.meta.SetValue("TIT2", []byte(e.Title), false)
+	case 2, 3, 4:
+		// All good.
+	case 0:
+		version = 3
 	default:
 		Debug("Version", version, "is not currently supported")
 		return
 	}
 
+	// Get the episode's timestamp.
 	ts := parseDate(e.Date)
 
 	frames := []struct {
@@ -197,14 +191,16 @@ func (e *Episode) addFrames() {
 		value string
 	}{
 		// Show information
-		{ "TP1", "TPE1", "TPE1", e.showArtist                   }, // Artist
-		{ "TP2", "TPE2", "TPE2", e.showArtist                   }, // Album Artist
+		{ "TP1", "TPE1", "TPE1", e.showArtist                 }, // Artist
+		{ "TP2", "TPE2", "TPE2", e.showArtist                 }, // Album Artist
+		{ "TAL", "TALB", "TALB", e.showTitle                  }, // Album Title
 
 		// Episode information
-		{ "TPA", "TPOS", "TPOS", e.Season                       },
-		{ "TRK", "TRCK", "TRCK", e.Number                       },
-		{ "TT3", "TDES", "TDES", e.Desc                         },
-		{ "WAF", "WOAF", "WOAF", e.Enclosure.URL                },
+		{ "TT2", "TIT2", "TIT2", e.Title                      }, // Episode title
+		{ "TPA", "TPOS", "TPOS", e.Season                     }, // Season number
+		{ "TRK", "TRCK", "TRCK", e.Number                     }, // Episode number
+		{ "TT3", "TDES", "TDES", e.Desc                       }, // Description
+		{ "WAF", "WOAF", "WOAF", e.Enclosure.URL              }, // Download link
 
 		// Dates
 		{ "TYE", "TYER", "",     ts.Format("2006")            }, // YYYY
@@ -213,8 +209,8 @@ func (e *Episode) addFrames() {
 		{ "",    "",     "TDRC", ts.Format("20060102T150405") }, // YYYYMMDDTHHMMSS
 
 		// Defaults
-		{ "TT1", "TCON", "TCON", "Podcast"                      },
-		{ "",    "PCST", "PCST", "1"                            },
+		{ "TT1", "TCON", "TCON", "Podcast"                    },
+		{ "",    "PCST", "PCST", "1"                          },
 	}
 
 	// Set these frames from the table above if a value is not already present.
