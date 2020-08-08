@@ -85,6 +85,7 @@ func (m *Meta) Write(p []byte) (int, error) {
 	// actually need.
 	need := length - (m.buffer.Len() - len(p))
 	m.buffer.Truncate(length)
+	m.Buffered()
 	return need, io.EOF
 }
 
