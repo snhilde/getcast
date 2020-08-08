@@ -77,6 +77,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	}
 
 	Debug("Downloading", len(s.Episodes), "episodes")
+	success := 0
 	for i, episode := range s.Episodes {
 		fmt.Println("\n--- Downloading", episode.Title, "---")
 		// Try up to 3 times to download the episode properly.
@@ -88,14 +89,16 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 					return i, fmt.Errorf("ERROR: All 3 download attempts failed")
 				}
 			} else if err != nil {
-				return i, fmt.Errorf("Error downloading episode: %v", err)
+				fmt.Println("Error downloading episode:", err)
+				break
 			} else {
+				success++
 				break
 			}
 		}
 	}
 
-	return len(s.Episodes), nil
+	return success, nil
 }
 
 
