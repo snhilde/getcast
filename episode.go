@@ -270,12 +270,12 @@ func (e *Episode) validateData() error {
 
 	Debug("Validating episode link:", e.Enclosure.URL)
 	if e.Enclosure.URL == "" {
-		return fmt.Errorf("Missing download link for %v", e.Title)
+		return fmt.Errorf("Missing download link")
 	}
 
 	Debug("Validating episode number:", e.Number)
 	if e.Number == "" {
-		Debug("No episode number found for", e.Title)
+		Debug("No episode number found")
 	}
 
 	return nil
