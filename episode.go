@@ -181,6 +181,13 @@ func (e *Episode) addFrames() {
 		return
 	}
 
+	// Always use the show title from the RSS feed.
+	showID := "TALB"
+	if e.meta.Version() == 2 {
+		showID = "TAL"
+	}
+	e.meta.SetValue(showID, []byte(e.showTitle), false)
+
 	// Get the episode's timestamp.
 	ts := parseDate(e.Date)
 
@@ -193,7 +200,6 @@ func (e *Episode) addFrames() {
 		// Show information
 		{ "TP1", "TPE1", "TPE1", e.showArtist                 }, // Artist
 		{ "TP2", "TPE2", "TPE2", e.showArtist                 }, // Album Artist
-		{ "TAL", "TALB", "TALB", e.showTitle                  }, // Album Title
 
 		// Episode information
 		{ "TT2", "TIT2", "TIT2", e.Title                      }, // Episode title
