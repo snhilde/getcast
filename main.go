@@ -64,8 +64,6 @@ func main() {
 	}
 	if err := ValidateDir(dir); err != nil {
 		Log(err)
-		fmt.Println("Usage:")
-		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
