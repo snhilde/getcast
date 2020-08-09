@@ -133,52 +133,46 @@ func (s *Show) filter(specificEp string) error {
 		defer file.Close()
 
 		// Build the metadata object so we can inspect the tag contents.
-		// (We're temporarily turning off Debug Mode so we don't spam print all the metadata frames.)
+		// (We're temporarily turning off Debug Mode so we don't spam print all the metadata frames. They'll still get
+		// written to the log.)
 		tmpDebug := DebugMode
 		DebugMode = false
 		meta := NewMeta(nil)
 		if _, err := io.Copy(meta, file); err != nil && err != io.EOF {
+			Debug("Stopping walk check early")
 			return err
 		}
 		DebugMode = tmpDebug
 
-		// We only want episodes from this show.
-		id := ""
+		seasonID := "TPOS"
 		if meta.Version() == 2 {
-			id = "TAL"
-		} else {
-			id = "TALB"
-		}
-		if value := getFirstValue(meta, id); value != s.Title {
-			Debug("Episode is from a different show:", value)
-			return nil
-		}
-
-		if meta.Version() == 2 {
-			id = "TPA"
-		} else {
-			id = "TPOS"
+			seasonID = "TPA"
 		}
 		season := 0
-		if value := getFirstValue(meta, id); value != "" {
+		if value := getFirstValue(meta, seasonID); value == "" {
+			Debug("No season found")
+		} else {
 			if num, err := strconv.Atoi(value); err == nil {
 				season = num
 				if season > latestSeason {
+					Debug("Increasing season to", season)
 					latestSeason = season
 				}
 			}
 		}
 
+		episodeID := "TRCK"
 		if meta.Version() == 2 {
-			id = "TRK"
-		} else {
-			id = "TRCK"
+			episodeID = "TRK"
 		}
 		episode := 0
-		if value := getFirstValue(meta, id); value != "" {
+		if value := getFirstValue(meta, episodeID); value == "" {
+			Debug("No episode found")
+		} else {
 			if num, err := strconv.Atoi(value); err == nil {
 				episode = num
 				if season == latestSeason && episode > latestEpisode {
+					Debug("Increasing episode to", episode)
 					latestEpisode = episode
 				}
 			}
