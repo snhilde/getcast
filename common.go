@@ -11,6 +11,15 @@ import (
 )
 
 
+// Log prints messages to stdout and all writes them to a log file if Log Mode is enabled.
+func Log(a ...interface{}) {
+	fmt.Println(a...)
+
+	if LogFile != nil {
+		fmt.Fprintln(LogFile, a...)
+	}
+}
+
 // Debug prints additional process information if debug mode is enabled.
 func Debug(a ...interface{}) {
 	if DebugMode {
@@ -19,6 +28,9 @@ func Debug(a ...interface{}) {
 		lines := strings.Split(out, "\n")
 		for _, line := range lines {
 			fmt.Println("(DEBUG)", line)
+			if LogFile != nil {
+				fmt.Fprintln(LogFile, "(DEBUG)", line)
+			}
 		}
 	}
 }

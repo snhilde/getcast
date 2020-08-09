@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	DebugMode bool
+	DebugMode  bool
+	LogFile   *os.File
 )
 
 
@@ -18,25 +19,35 @@ func main() {
 	urlArg := flag.String("u", "", "Required. URL of show's RSS feed")
 	dirArg := flag.String("d", "", "Required. Main download directory for all podcasts")
 	numArg := flag.String("n", "", "Optional. Episode number to download. If podcast also has season, specify the episode like this: seasonNum-episodeNum, e.g. 3-5 to download episode 5 of season 3.")
+	logArg := flag.String("l", "", "Optional. Path to log, for writing all debug and non-debug statements")
 	debugFlag := flag.Bool("v", false, "Enable debug mode")
 	flag.Parse()
 
-	if (*debugFlag) {
+	if *debugFlag {
 		DebugMode = true
 		Debug("Debug mode enabled")
 	}
 
+	if *logArg != "" {
+		if file, err := os.Create(*logArg); err != nil {
+			Log("Error creating log file:", err)
+		} else {
+			LogFile = file
+			defer LogFile.Close()
+		}
+	}
+
 	if *urlArg == "" {
-		fmt.Println("No show specified")
+		Log("No show specified")
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	fmt.Println("Beginning sync process")
+	Log("Beginning sync process")
 
 	u, err := url.Parse(strings.ToLower(*urlArg))
 	if err != nil {
-		fmt.Println("Invalid URL:", err)
+		Log("Invalid URL:", err)
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -46,13 +57,13 @@ func main() {
 	// Validate (or create) the download directory.
 	dir := path.Clean(*dirArg)
 	if dir == "" {
-		fmt.Println("No download directory specified")
+		Log("No download directory specified")
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	if err := ValidateDir(dir); err != nil {
-		fmt.Println(err)
+		Log(err)
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -61,10 +72,10 @@ func main() {
 	// And sync the show.
 	n, err := show.Sync(dir, *numArg)
 	if err != nil {
-		fmt.Println(err)
+		Log(err)
 		os.Exit(1)
 	}
 
-	fmt.Println()
-	fmt.Println("Synced", n, "episodes")
+	Log("")
+	Log("Synced", n, "episodes")
 }

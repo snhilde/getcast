@@ -76,7 +76,7 @@ func (e *Episode) Download(showDir string) error {
 
 	size, err := strconv.Atoi(e.Enclosure.Size)
 	if err == nil && int(resp.ContentLength) != size {
-		fmt.Println("Warning: RSS feed is reporting episode size different than currently exists")
+		Log("Warning: RSS feed is reporting episode size different than currently exists")
 		Debug("RSS feed size: ", size, "bytes")
 		Debug("Available size:", resp.ContentLength, "bytes")
 	}

@@ -72,24 +72,25 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 		if specificEp != "" {
 			return 0, fmt.Errorf("Episode %v not found", specificEp)
 		} else {
-			return 0, fmt.Errorf("No new episodes")
+			Log("No new episodes")
+			return 0, nil
 		}
 	}
 
-	fmt.Println("Downloading", len(s.Episodes), "episodes")
+	Log("Downloading", len(s.Episodes), "episodes")
 	success := 0
 	for i, episode := range s.Episodes {
-		fmt.Println("\n--- Downloading", episode.Title, "---")
+		Log("\n--- Downloading", episode.Title, "---")
 		// Try up to 3 times to download the episode properly.
 		for j := 1; j <= 3; j++ {
 			if err := episode.Download(s.Dir); err == errDownload {
 				if j < 3 {
-					fmt.Println("Download attempt", j, "of 3 failed, trying again")
+					Log("Download attempt", j, "of 3 failed, trying again")
 				} else {
 					return i, fmt.Errorf("ERROR: All 3 download attempts failed")
 				}
 			} else if err != nil {
-				fmt.Println("Error downloading episode:", err)
+				Log("Error downloading episode:", err)
 				break
 			} else {
 				success++
@@ -190,7 +191,7 @@ func (s *Show) filter(specificEp string) error {
 
 	want := []Episode{}
 	if specificEp != "" {
-		fmt.Println("Looking for specified episode")
+		Log("Looking for specified episode")
 		ep := findSpecific(s.Episodes, specificEp)
 		if ep == (Episode{}) {
 			want = nil
@@ -198,7 +199,7 @@ func (s *Show) filter(specificEp string) error {
 			want = []Episode{ep}
 		}
 	} else {
-		fmt.Println("Looking for most current episode already synced")
+		Log("Looking for most current episode already synced")
 		if err := filepath.Walk(s.Dir, walkFunc); err != nil {
 			return err
 		}
@@ -237,7 +238,7 @@ func findSpecific(episodes []Episode, specified string) Episode {
 	case 1:
 		// Only an episode was specified.
 		if num, err := strconv.Atoi(parts[0]); err != nil {
-			fmt.Println("Error parsing specified episode:", err)
+			Log("Error parsing specified episode:", err)
 			return Episode{}
 		} else {
 			specificEpisode = num
@@ -245,20 +246,20 @@ func findSpecific(episodes []Episode, specified string) Episode {
 	case 2:
 		// An episode and a season were specified.
 		if num, err := strconv.Atoi(parts[0]); err != nil {
-			fmt.Println("Error parsing specified season:", err)
+			Log("Error parsing specified season:", err)
 			return Episode{}
 		} else {
 			specificSeason = num
 		}
 
 		if num, err := strconv.Atoi(parts[1]); err != nil {
-			fmt.Println("Error parsing specified episode:", err)
+			Log("Error parsing specified episode:", err)
 			return Episode{}
 		} else {
 			specificEpisode = num
 		}
 	default:
-		fmt.Println("Error parsing specified episode/season")
+		Log("Error parsing specified episode/season")
 		return Episode{}
 	}
 
@@ -267,9 +268,9 @@ func findSpecific(episodes []Episode, specified string) Episode {
 		number, _ := strconv.Atoi(episode.Number)
 		if season == specificSeason && number == specificEpisode {
 			if specificSeason > 0 {
-				fmt.Println("Found episode", specificEpisode, "of season", specificSeason)
+				Log("Found episode", specificEpisode, "of season", specificSeason)
 			} else {
-				fmt.Println("Found episode", specificEpisode)
+				Log("Found episode", specificEpisode)
 			}
 			return episode
 		}
@@ -285,9 +286,9 @@ func findNewer(episodes []Episode, latestSeason int, latestEpisode int) []Episod
 	newer := []Episode{}
 
 	if latestSeason > 0 {
-		fmt.Println("Latest episode found is episode", latestEpisode, "of season", latestSeason)
+		Log("Latest episode found is episode", latestEpisode, "of season", latestSeason)
 	} else {
-		fmt.Println("Latest episode found is episode", latestEpisode)
+		Log("Latest episode found is episode", latestEpisode)
 	}
 
 	for _, episode := range episodes {
@@ -306,7 +307,7 @@ func findNewer(episodes []Episode, latestSeason int, latestEpisode int) []Episod
 func findUnsynced(episodes []Episode, have map[string]int) []Episode {
 	unsynced := []Episode{}
 
-	fmt.Println("Could not determine latest episode, syncing everything")
+	Log("Could not determine latest episode, syncing everything")
 
 	for _, episode := range episodes {
 		if _, ok := have[episode.Title]; !ok {
