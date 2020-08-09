@@ -11,7 +11,7 @@ import (
 )
 
 
-// Log prints messages to stdout and all writes them to a log file if Log Mode is enabled.
+// Log prints messages to stdout. If a Log File was specified, it also writes everything to the log.
 func Log(a ...interface{}) {
 	fmt.Println(a...)
 
@@ -20,14 +20,17 @@ func Log(a ...interface{}) {
 	}
 }
 
-// Debug prints additional process information if debug mode is enabled.
+// Debug prints additional process information if Debug Mode is enabled. If a Log File was specified, it also writes
+// everything to the log.
 func Debug(a ...interface{}) {
-	if DebugMode {
+	if DebugMode || LogFile != nil {
 		out := fmt.Sprintln(a...)
 		out = strings.TrimSuffix(out, "\n")
 		lines := strings.Split(out, "\n")
 		for _, line := range lines {
-			fmt.Println("(DEBUG)", line)
+			if DebugMode {
+				fmt.Println("(DEBUG)", line)
+			}
 			if LogFile != nil {
 				fmt.Fprintln(LogFile, "(DEBUG)", line)
 			}
