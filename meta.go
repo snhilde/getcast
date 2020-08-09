@@ -397,7 +397,7 @@ func (m *Meta) parseFrames() {
 		value = bytes.TrimSuffix(value, []byte{0x00})
 
 		// Debug print everything but the image bytes.
-		if string(id) != "APIC" {
+		if string(id) != "PIC" && string(id) != "APIC" {
 			Debug("Found", string(id), "-", string(value))
 		}
 		m.frames = append(m.frames, Frame{string(id), value})
