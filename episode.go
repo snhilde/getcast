@@ -264,12 +264,6 @@ func (e *Episode) validateData() error {
 		return fmt.Errorf("Missing episode title")
 	}
 
-	e.Title = SanitizeTitle(e.Title)
-	ext := mimeToExt(e.Enclosure.Type)
-	if !strings.HasSuffix(e.Title, ext) {
-		e.Title += ext
-	}
-
 	Debug("Validating episode link:", e.Enclosure.URL)
 	if e.Enclosure.URL == "" {
 		return fmt.Errorf("Missing download link")
@@ -287,12 +281,17 @@ func (e *Episode) validateData() error {
 // TODO: Right now, we are always adding a season/episode prefix. A good area of future development would be to make
 // this more intelligent so that it's only added when it doesn't already exist in the title.
 func (e *Episode) buildFilename(path string) string {
-	base := e.Title
+	base := SanitizeTitle(e.Title)
 	if e.Number != "" {
 		base = e.Number + " " + base
 		if e.Season != "" {
 			base = e.Season + "-" + base
 		}
+	}
+
+	ext := mimeToExt(e.Enclosure.Type)
+	if !strings.HasSuffix(base, ext) {
+		base += ext
 	}
 
 	return filepath.Join(path, base)
