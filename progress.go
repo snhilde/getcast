@@ -33,7 +33,7 @@ func (pr *Progress) Write(p []byte) (int, error) {
 	}
 
 	// Clear the line and print the current status.
-	fmt.Printf("\r%s", strings.Repeat(" ", 50))
+	fmt.Printf("\r%s", strings.Repeat(" ", 35))
 	fmt.Printf("%v", pr.String())
 
 	return n, nil
@@ -51,7 +51,7 @@ func (pr *Progress) String() string {
 // Finish cleans up the terminal line and prints the overall success of the download operation.
 func (pr *Progress) Finish() error {
 	// Print the final status.
-	fmt.Printf("\r%s", strings.Repeat(" ", 50))
+	fmt.Printf("\r%s", strings.Repeat(" ", 35))
 	fmt.Printf("%v", pr.String())
 
 	// Because we've been mucking around with carriage returns, we need to manually move down a row.
