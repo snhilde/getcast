@@ -1,29 +1,27 @@
 package main
 
 import (
-	"net/url"
-	"net/http"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"encoding/xml"
-	"path/filepath"
+	"net/http"
+	"net/url"
 	"os"
-	"strings"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
-
 
 // Show is the main type. It holds information about the podcast and its episodes.
 type Show struct {
-	URL       *url.URL
-	Dir        string  // show's directory on disk
-	Title      string  `xml:"channel>title"`
-	Author     string  `xml:"channel>author"`
-	Image      string  `xml:"channel>image,href"`
+	URL      *url.URL
+	Dir      string    // show's directory on disk
+	Title    string    `xml:"channel>title"`
+	Author   string    `xml:"channel>author"`
+	Image    string    `xml:"channel>image,href"`
 	Episodes []Episode `xml:"channel>item"`
 }
-
 
 // Sync gets the current list of available episodes, determines which of them need to be downloaded, and then gets them.
 func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
@@ -50,7 +48,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	// The feed will list episodes newest to oldest. We'll reverse that here to make error handling easier later on.
 	length := len(s.Episodes)
 	for i := 0; i < length/2; i++ {
-		s.Episodes[i], s.Episodes[length - 1 - i] = s.Episodes[length - 1 - i], s.Episodes[i]
+		s.Episodes[i], s.Episodes[length-1-i] = s.Episodes[length-1-i], s.Episodes[i]
 	}
 
 	// Make sure we can create directories and files with the names that were parsed earlier from the RSS feed.
@@ -108,7 +106,6 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 
 	return success, nil
 }
-
 
 // filter filters out the episodes we don't want to download.
 func (s *Show) filter(specificEp string) error {
@@ -185,7 +182,6 @@ func (s *Show) filter(specificEp string) error {
 
 	return nil
 }
-
 
 // findSpecific finds the specified episode among the episodes available for download. A season can also be specified by
 // separating the season and episode numbers with a "-".

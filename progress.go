@@ -6,11 +6,9 @@ import (
 	"strings"
 )
 
-
 var (
 	errDownload = errors.New("Error downloading correct data")
 )
-
 
 // Progress is used to keep track during the download process and to display a progress bar during the operation.
 type Progress struct {
@@ -20,7 +18,6 @@ type Progress struct {
 	writeCount  int    // running count of write operations, for determining if we should print or not
 }
 
-
 // Write prints the number of bytes written to stdout.
 func (pr *Progress) Write(p []byte) (int, error) {
 	n := len(p)
@@ -28,7 +25,7 @@ func (pr *Progress) Write(p []byte) (int, error) {
 
 	// We don't need to do expensive print operations that often.
 	pr.writeCount++
-	if pr.writeCount % 50 > 0 {
+	if pr.writeCount%50 > 0 {
 		return n, nil
 	}
 

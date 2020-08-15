@@ -1,45 +1,43 @@
 package main
 
 import (
-	"io"
-	"fmt"
-	"os"
-	"net/http"
-	"strconv"
-	"time"
-	"strings"
-	"path/filepath"
-	"net/url"
-	"io/ioutil"
 	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
 
-
 // Episode represents internal data related to each episode of the podcast.
-type Episode  struct {
+type Episode struct {
 	// Show information
-	showTitle   string
-	showArtist  string
-	showImage   string
+	showTitle  string
+	showArtist string
+	showImage  string
 
 	// Episode information
-	Title       string    `xml:"title"`
-	Season      string    `xml:"season"`
-	Number      string    `xml:"episode"`
-	Image       string    `xml:"image,href"`
-	Desc        string    `xml:"description"`
-	Date        string    `xml:"pubDate"`
-	Enclosure   struct {
-		URL         string    `xml:"url,attr"`
-		Size        string    `xml:"length,attr"`
-		Type        string    `xml:"type,attr"`
+	Title     string `xml:"title"`
+	Season    string `xml:"season"`
+	Number    string `xml:"episode"`
+	Image     string `xml:"image,href"`
+	Desc      string `xml:"description"`
+	Date      string `xml:"pubDate"`
+	Enclosure struct {
+		URL  string `xml:"url,attr"`
+		Size string `xml:"length,attr"`
+		Type string `xml:"type,attr"`
 	} `xml:"enclosure"`
 
 	// Objects to handle reading/writing
-	meta       *Meta      // Metadata object
-	w           io.Writer // Writer that will handle writing the file.
+	meta *Meta     // Metadata object
+	w    io.Writer // Writer that will handle writing the file.
 }
-
 
 // Download downloads the episode. The bytes will stream through this path from web to disk:
 // Internet -> http object -> Episode object -> Disk
@@ -162,7 +160,6 @@ func (e *Episode) SetShowImage(image string) {
 	}
 }
 
-
 // addFrames fleshes out the metadata with information from the episode. If a frame already exists in the metadata, it
 // will not be overwritten with data from the RSS feed. The only exceptions to this rule are the show and episode
 // titles, which must match the data from the RSS feed to sync properly.
@@ -200,24 +197,24 @@ func (e *Episode) addFrames() {
 		value string
 	}{
 		// Show information
-		{ "TP1", "TPE1", "TPE1", e.showArtist                 }, // Artist
-		{ "TP2", "TPE2", "TPE2", e.showArtist                 }, // Album Artist
+		{"TP1", "TPE1", "TPE1", e.showArtist}, // Artist
+		{"TP2", "TPE2", "TPE2", e.showArtist}, // Album Artist
 
 		// Episode information
-		{ "TPA", "TPOS", "TPOS", e.Season                     }, // Season number
-		{ "TRK", "TRCK", "TRCK", e.Number                     }, // Episode number
-		{ "TT3", "TDES", "TDES", e.Desc                       }, // Description
-		{ "WAF", "WOAF", "WOAF", e.Enclosure.URL              }, // Download link
+		{"TPA", "TPOS", "TPOS", e.Season},        // Season number
+		{"TRK", "TRCK", "TRCK", e.Number},        // Episode number
+		{"TT3", "TDES", "TDES", e.Desc},          // Description
+		{"WAF", "WOAF", "WOAF", e.Enclosure.URL}, // Download link
 
 		// Dates
-		{ "TYE", "TYER", "",     ts.Format("2006")            }, // YYYY
-		{ "TDA", "TDAT", "",     ts.Format("0201")            }, // DDMM
-		{ "TIM", "TIME", "",     ts.Format("1504")            }, // HHMM
-		{ "",    "",     "TDRC", ts.Format("20060102T150405") }, // YYYYMMDDTHHMMSS
+		{"TYE", "TYER", "", ts.Format("2006")},         // YYYY
+		{"TDA", "TDAT", "", ts.Format("0201")},         // DDMM
+		{"TIM", "TIME", "", ts.Format("1504")},         // HHMM
+		{"", "", "TDRC", ts.Format("20060102T150405")}, // YYYYMMDDTHHMMSS
 
 		// Defaults
-		{ "TT1", "TCON", "TCON", "Podcast"                    },
-		{ "",    "PCST", "PCST", "1"                          },
+		{"TT1", "TCON", "TCON", "Podcast"},
+		{"", "PCST", "PCST", "1"},
 	}
 
 	// Set these frames from the table above if a value is not already present.
@@ -378,7 +375,6 @@ func (e *Episode) downloadImage() []byte {
 
 	return buf.Bytes()
 }
-
 
 // mimeToExt finds the appropriate file extension based on the MIME type.
 func mimeToExt(mime string) string {

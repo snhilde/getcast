@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"math"
-	"strconv"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 )
-
 
 // Log prints messages to stdout. If a Log File was specified, it also writes everything to the log.
 func Log(a ...interface{}) {
@@ -40,6 +39,7 @@ func Debug(a ...interface{}) {
 
 // Reduce converts the number of bytes into its human-readable value (less than 1024) with SI unit suffix appended.
 var units = []string{"B", "K", "M", "G"}
+
 func Reduce(n int) string {
 	if n <= 0 {
 		return "0B"
@@ -101,9 +101,9 @@ func ValidateDir(path string) error {
 
 		// Find out which of the directory's user, group, and other read bits are set.
 		perms := info.Mode().Perm() & os.ModePerm
-		uRead := perms & (1 << 8) > 0
-		gRead := perms & (1 << 5) > 0
-		oRead := perms & (1 << 2) > 0
+		uRead := perms&(1<<8) > 0
+		gRead := perms&(1<<5) > 0
+		oRead := perms&(1<<2) > 0
 
 		// Check for read permission.
 		if !(isUser && uRead) && !(isGroup && gRead) && !oRead {
@@ -111,9 +111,9 @@ func ValidateDir(path string) error {
 		}
 
 		// Find out which of the directory's user, group, and other write bits are set.
-		uWrite := perms & (1 << 7) > 0
-		gWrite := perms & (1 << 4) > 0
-		oWrite := perms & (1 << 1) > 0
+		uWrite := perms&(1<<7) > 0
+		gWrite := perms&(1<<4) > 0
+		oWrite := perms&(1<<1) > 0
 
 		// Check for write permission.
 		if !(isUser && uWrite) && !(isGroup && gWrite) && !oWrite {

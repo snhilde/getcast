@@ -3,17 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"net/url"
-	"strings"
+	"os"
 	"path"
+	"strings"
 )
 
 var (
-	DebugMode  bool
+	DebugMode bool
 	LogFile   *os.File
 )
-
 
 func main() {
 	urlArg := flag.String("u", "", "Required. URL of show's RSS feed")

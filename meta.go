@@ -2,35 +2,32 @@
 package main
 
 import (
-	"errors"
 	"bytes"
+	"errors"
+	"golang.org/x/text/encoding/unicode"
 	"io"
 	"strings"
-	"golang.org/x/text/encoding/unicode"
 )
-
 
 var (
 	// badMeta is the error returned when a nil meta object is used.
 	badMeta = errors.New("Invalid meta object")
 )
 
-
 // Type Meta is the main type used. It holds all the information related to the metadata.
 type Meta struct {
-	buffer      *bytes.Buffer // buffer to store filedata between successive Write operations
-	buffered     bool         // whether or not all metadata is present in the buffer
-	noMeta       bool         // whether or not the file has any metadata
-	readFrames   bool         // whether or not the metadata frames have been read and parsed.
-	frames     []Frame        // list of frames
+	buffer     *bytes.Buffer // buffer to store filedata between successive Write operations
+	buffered   bool          // whether or not all metadata is present in the buffer
+	noMeta     bool          // whether or not the file has any metadata
+	readFrames bool          // whether or not the metadata frames have been read and parsed.
+	frames     []Frame       // list of frames
 }
 
 // Type Frame is used to store information about a metadata frame.
 type Frame struct {
-	id      string
+	id    string
 	value []byte
 }
-
 
 // NewMeta creates a new Meta object. If file data is passed in, NewMeta will read as much of the metadata from it as possible.
 func NewMeta(file []byte) *Meta {
@@ -42,7 +39,6 @@ func NewMeta(file []byte) *Meta {
 
 	return m
 }
-
 
 // Write buffers metadata into the internal buffer. When the metadata has been completely written, Write will stop
 // writing to the buffer and return (n, io.EOF), with n designating how many bytes were consumed in this operation.
@@ -91,7 +87,7 @@ func (m *Meta) Write(p []byte) (int, error) {
 
 // Buffered checks if all of the metadata for the episode's file has been fully buffered or not. If the file doesn't
 // have any metadata, then this will return true.
-func (m * Meta) Buffered() bool {
+func (m *Meta) Buffered() bool {
 	if m == nil || m.buffer == nil {
 		return false
 	}
@@ -247,14 +243,12 @@ func (m *Meta) Build() []byte {
 	return metadata.Bytes()
 }
 
-
 // buildFrames builds only the frames of the episode's metadata from the internal list of id/value pairs.
 func (m *Meta) buildFrames(version byte) []byte {
 	if m == nil || !m.Buffered() {
 		return nil
 	}
 	Debug("Building metadata frames")
-
 
 	buf := new(bytes.Buffer)
 	for _, frame := range m.frames {
@@ -269,7 +263,7 @@ func (m *Meta) buildFrames(version byte) []byte {
 			buf.WriteString(strings.ToUpper(frame.id))
 
 			// Write length. (+2 for encoding bytes around value.)
-			length := writeLen(len(frame.value) + 2, version, false)
+			length := writeLen(len(frame.value)+2, version, false)
 			buf.Write(length)
 
 			// Write value. 0x03 header with 0x00 footer indicates that the value is UTF-8. (We store everything as UTF-8.)
@@ -287,7 +281,7 @@ func (m *Meta) buildFrames(version byte) []byte {
 			buf.WriteString(strings.ToUpper(frame.id))
 
 			// Write length. (+2 for encoding bytes around value.)
-			length := writeLen(len(frame.value) + 2, version, false)
+			length := writeLen(len(frame.value)+2, version, false)
 			buf.Write(length)
 
 			// Write flags.
@@ -330,7 +324,7 @@ func (m *Meta) parseFrames() {
 	buf.Next(4)
 
 	// Skip past the extended header, if present (not needed for ID3v2.2).
-	if version != 2 && flags & (1 << 6) > 0 {
+	if version != 2 && flags&(1<<6) > 0 {
 		length := readLen(buf, version, true)
 		buf.Next(length - 4)
 	}
@@ -363,7 +357,7 @@ func (m *Meta) parseFrames() {
 			}
 
 			// We only want the frame if these flags are not set.
-			if flags[1] & 0x0C > 0 {
+			if flags[1]&0x0C > 0 {
 				buf.Next(size)
 				Debug("Skipping frame")
 				continue
@@ -451,7 +445,6 @@ func (m *Meta) length() int {
 	return length + 10
 }
 
-
 // readID reads the appropriate ID out of the beginning of the buffer and validates the data. This advances the buffer.
 // ID3v2.2 frame IDs are 3 bytes, while v2.3 and v2.4 frame IDs are 4 bytes.
 func readID(buf *bytes.Buffer, version byte) []byte {
@@ -526,7 +519,7 @@ func writeLen(n int, version byte, header bool) []byte {
 
 	buf := make([]byte, bufLen)
 	for i := range buf {
-		buf[bufLen - 1 - i] = byte(n) & refByte
+		buf[bufLen-1-i] = byte(n) & refByte
 		n >>= shiftWidth
 	}
 
