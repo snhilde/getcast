@@ -38,8 +38,6 @@ func Debug(a ...interface{}) {
 }
 
 // Reduce converts the number of bytes into its human-readable value (less than 1024) with SI unit suffix appended.
-var units = []string{"B", "K", "M", "G"}
-
 func Reduce(n int) string {
 	if n <= 0 {
 		return "0B"
@@ -48,6 +46,7 @@ func Reduce(n int) string {
 	index := int(math.Log2(float64(n))) / 10
 	n >>= (10 * index)
 
+	units := []string{"B", "K", "M", "G"}
 	return strconv.Itoa(n) + units[index]
 }
 
