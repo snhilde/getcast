@@ -111,10 +111,10 @@ func (e *Episode) Write(p []byte) (int, error) {
 		if n, err := e.meta.Write(p); err != io.EOF {
 			// Either more data is needed or there was an error writing the metadata.
 			return n, err
-		} else {
-			// All metadata has been written. The rest of the bytes are filedata.
-			consumed = n
 		}
+
+		// All metadata has been written. The rest of the bytes are filedata.
+		consumed = n
 
 		// Now that we have all of the metadata, let's build it with the additional data from the episode and write
 		// everything to disk.
