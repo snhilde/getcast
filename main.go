@@ -10,8 +10,11 @@ import (
 )
 
 var (
+	// DebugMode signals whether or not we will print debug statements.
 	DebugMode bool
-	LogFile   *os.File
+
+	// LogFile is the file where we will write all log/debug statements.
+	LogFile *os.File
 )
 
 func main() {
