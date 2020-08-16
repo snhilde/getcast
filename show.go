@@ -75,10 +75,9 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	if len(s.Episodes) == 0 {
 		if specificEp != "" {
 			return 0, fmt.Errorf("Episode %v not found", specificEp)
-		} else {
-			Log("No new episodes")
-			return 0, nil
 		}
+		Log("No new episodes")
+		return 0, nil
 	}
 
 	Log("Downloading", len(s.Episodes), "episodes")
@@ -200,24 +199,21 @@ func findSpecific(episodes []Episode, specified string) (Episode, bool) {
 		if num, err := strconv.Atoi(parts[0]); err != nil {
 			Log("Error parsing specified episode:", err)
 			return Episode{}, false
-		} else {
-			specificEpisode = num
 		}
+		specificEpisode = num
 	case 2:
 		// An episode and a season were specified.
 		if num, err := strconv.Atoi(parts[0]); err != nil {
 			Log("Error parsing specified season:", err)
 			return Episode{}, false
-		} else {
-			specificSeason = num
 		}
+		specificSeason = num
 
 		if num, err := strconv.Atoi(parts[1]); err != nil {
 			Log("Error parsing specified episode:", err)
 			return Episode{}, false
-		} else {
-			specificEpisode = num
 		}
+		specificEpisode = num
 	default:
 		Log("Error parsing specified episode/season")
 		return Episode{}, false
