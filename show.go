@@ -199,21 +199,24 @@ func findSpecific(episodes []Episode, specified string) (Episode, bool) {
 		if num, err := strconv.Atoi(parts[0]); err != nil {
 			Log("Error parsing specified episode:", err)
 			return Episode{}, false
+		} else {
+			specificEpisode = num
 		}
-		specificEpisode = num
 	case 2:
 		// An episode and a season were specified.
 		if num, err := strconv.Atoi(parts[0]); err != nil {
 			Log("Error parsing specified season:", err)
 			return Episode{}, false
+		} else {
+			specificSeason = num
 		}
-		specificSeason = num
 
 		if num, err := strconv.Atoi(parts[1]); err != nil {
 			Log("Error parsing specified episode:", err)
 			return Episode{}, false
+		} else {
+			specificEpisode = num
 		}
-		specificEpisode = num
 	default:
 		Log("Error parsing specified episode/season")
 		return Episode{}, false
