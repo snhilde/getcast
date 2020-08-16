@@ -3,18 +3,13 @@ package main
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"golang.org/x/text/encoding/unicode"
 	"io"
 	"strings"
 )
 
-var (
-	// badMeta is the error returned when a nil meta object is used.
-	badMeta = errors.New("Invalid meta object")
-)
-
-// Type Meta is the main type used. It holds all the information related to the metadata.
+// Meta is the main type used. It holds all the information related to the metadata.
 type Meta struct {
 	buffer     *bytes.Buffer // buffer to store filedata between successive Write operations
 	buffered   bool          // whether or not all metadata is present in the buffer
@@ -23,7 +18,7 @@ type Meta struct {
 	frames     []Frame       // list of frames
 }
 
-// Type Frame is used to store information about a metadata frame.
+// Frame is used to store information about a metadata frame.
 type Frame struct {
 	id    string
 	value []byte
@@ -44,7 +39,7 @@ func NewMeta(file []byte) *Meta {
 // writing to the buffer and return (n, io.EOF), with n designating how many bytes were consumed in this operation.
 func (m *Meta) Write(p []byte) (int, error) {
 	if m == nil {
-		return 0, badMeta
+		return 0, fmt.Errorf("Invalid meta object")
 	}
 
 	if m.buffer == nil {
