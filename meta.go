@@ -113,7 +113,7 @@ func (m *Meta) Buffered() bool {
 
 // Bytes returns all the bytes currently buffered.
 func (m *Meta) Bytes() []byte {
-	if m == nil {
+	if m == nil || m.buffer == nil {
 		return nil
 	}
 
@@ -122,7 +122,7 @@ func (m *Meta) Bytes() []byte {
 
 // Len returns the number of bytes currently buffered.
 func (m *Meta) Len() int {
-	if m == nil {
+	if m == nil || m.buffer == nil {
 		return 0
 	}
 
@@ -131,7 +131,7 @@ func (m *Meta) Len() int {
 
 // Version returns the version of ID3v2 metadata in use, or 0 if not found.
 func (m *Meta) Version() byte {
-	if m == nil || m.noMeta || m.buffer.Len() < 4 {
+	if m == nil || m.noMeta || m.buffer == nil || m.buffer.Len() < 4 {
 		return 0
 	}
 
