@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // Show is the main type. It holds information about the podcast and its episodes.
@@ -95,6 +97,10 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 				}
 			} else if err != nil {
 				Log("Error downloading episode:", err)
+				if errors.Is(err, syscall.ENOSPC) {
+					// If there's no space left for writing, then we'll stop the entire process.
+					return success, errors.New("No space left on disk, stopping process")
+				}
 				break
 			} else {
 				success++
