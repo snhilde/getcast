@@ -91,6 +91,7 @@ func (e *Episode) Download(showDir string) error {
 	if err != nil {
 		Debug("I/O Copy error:", err)
 		os.Remove(filename)
+		bar.Finish()
 		return err
 	}
 
