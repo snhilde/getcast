@@ -71,11 +71,11 @@ func main() {
 
 	// And sync the show.
 	n, err := show.Sync(dir, *numArg)
+	Log("")
+	Log("Synced", n, "episodes")
+
 	if err != nil {
 		Log(err)
 		os.Exit(1)
 	}
-
-	Log("")
-	Log("Synced", n, "episodes")
 }
