@@ -12,9 +12,7 @@
 1. Download the repository:
 `git clone https://github.com/snhilde/getcast`
 2. Build and install:
-`cd getcast`
-`go install`
-(If you need the go tools, you can [grab them here](https://golang.org/doc/install)).
+`cd getcast && go install` (If you need the go tools, you can [grab them here](https://golang.org/doc/install)).
 3. Run the program:
 `getcast -d [path to podcasts] -u [URL of RSS feed]`
 
