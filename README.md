@@ -6,7 +6,7 @@
 `getcast` is a utility for archiving podcasts.
 
 ## Introduction
-`getcast` syncs local show repositories with episodes currently available online. You tell it where the podcasts are synced locally and supply it with a show's RSS feed, and it either grabs the latest episodes or syncs all episodes if it can't determine episode numbers. `getcast` includes native support for ID3v2 metadata (version 2.2, 2.3, and 2.4) and augments the file information with information skimmed from the RSS feed.
+`getcast` syncs local show repositories with episodes currently available online. You tell it where the podcasts are synced locally and supply it with a show's RSS feed, and it grabs all the episodes not currently synced. `getcast` includes native support for ID3v2 metadata (version 2.2, 2.3, and 2.4) and augments the metadata with information skimmed from the RSS feed.
 
 ## Usage
 1. Download the repository:
