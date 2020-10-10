@@ -74,15 +74,19 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 		return 0, fmt.Errorf("Error selecting episodes: %v", err)
 	}
 
-	if len(s.Episodes) == 0 {
+	switch len(s.Episodes) {
+	case 0:
 		if specificEp != "" {
 			return 0, fmt.Errorf("Episode %v not found", specificEp)
 		}
 		Log("No new episodes")
 		return 0, nil
+	case 1:
+		Log("Downloading 1 episode")
+	default:
+		Log("Downloading", len(s.Episodes), "episodes")
 	}
 
-	Log("Downloading", len(s.Episodes), "episodes")
 	success := 0
 	for _, episode := range s.Episodes {
 		Log("\n--- Downloading", episode.Title, "---")
