@@ -492,7 +492,7 @@ func readLen(buf *bytes.Buffer, version byte, header bool) int {
 		num |= int32(b)
 	}
 
-	return num
+	return int(num)
 }
 
 // writeLen converts the integer into a byte slice, big-endian. Header lengths are always stored as synch-safe bytes
