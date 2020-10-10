@@ -397,10 +397,11 @@ func (m *Meta) parseFrames() {
 // parsed (possibly indicating that more metadata is needed). It is not necessary to have the entire metadata buffered.
 // If no metadata exists in the file's contents, this will return 0.
 func (m *Meta) length() int {
+	if m == nil || m.buffer == nil {
+		return -1
+	}
 	if m.noMeta {
 		return 0
-	} else if m == nil || m.buffer == nil {
-		return -1
 	}
 
 	buf := bytes.NewBuffer(m.buffer.Bytes())
