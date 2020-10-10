@@ -467,8 +467,8 @@ func readID(buf *bytes.Buffer, version byte) []byte {
 
 // readLen reads a big-endian length out of the bytes. Header lengths are always read as synch-safe bytes (meaning that
 // only the first 7 bits of each byte are used for counting, with the high bit ignored). Frame lengths are read as
-// synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3. Additionally, ID3v2.2 frame lengths are only 3
-// bytes long.
+// synch-safe bytes for ID3v2.2 and ID3v2.4 and regular 8-bit bytes for ID3v2.3. Additionally, ID3v2.2 frame lengths are
+// only 3 bytes long.
 func readLen(buf *bytes.Buffer, version byte, header bool) int {
 	bufLen := 4
 	if version == 2 && !header {
@@ -497,8 +497,8 @@ func readLen(buf *bytes.Buffer, version byte, header bool) int {
 
 // writeLen converts the integer into a byte slice, big-endian. Header lengths are always stored as synch-safe bytes
 // (meaning that only the first 7 bits of each byte are used for counting, with the high bit ignored). Frame lengths are
-// stored as synch-safe bytes for ID3v2.4 and regular 32-bit bytes for ID3v2.3. Additionally, ID3v2.2 frame lengths are
-// only 3 bytes long.
+// stored as synch-safe bytes for ID3v2.2 and ID3v2.4 and regular 8-bit bytes for ID3v2.3. Additionally, ID3v2.2 frame
+// lengths are only 3 bytes long.
 func writeLen(n int, version byte, header bool) []byte {
 	bufLen := 4
 	shiftWidth := 7
