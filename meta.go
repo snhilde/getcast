@@ -486,10 +486,10 @@ func readLen(buf *bytes.Buffer, version byte, header bool) int {
 		width = 8
 	}
 
-	num := int(0)
+	num := int32(0)
 	for _, b := range bytes {
 		num <<= width
-		num |= int(b)
+		num |= int32(b)
 	}
 
 	return num
