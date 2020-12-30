@@ -89,7 +89,14 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 
 	success := 0
 	for _, episode := range s.Episodes {
-		Log("\n--- Downloading", episode.Title, "---")
+		message := fmt.Sprintf("\n--- Downloading %s", episode.Title)
+		if episode.Season != "" && episode.Number != "" {
+			message += fmt.Sprintf(" (%s-%s)", episode.Season, episode.Number)
+		} else if episode.Number != "" {
+			message += fmt.Sprintf(" (%s)", episode.Number)
+		}
+		message += " ---"
+		Log(message)
 		// Try up to 3 times to download the episode properly.
 		for j := 1; j <= 3; j++ {
 			if err := episode.Download(s.Dir); err == errDownload {
