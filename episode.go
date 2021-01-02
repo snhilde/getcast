@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -70,13 +69,6 @@ func (e *Episode) Download(showDir string) error {
 	if resp.StatusCode != 200 {
 		os.Remove(filename)
 		return fmt.Errorf("%v", resp.Status)
-	}
-
-	size, err := strconv.Atoi(e.Enclosure.Size)
-	if err == nil && int(resp.ContentLength) != size {
-		Log("Warning: RSS feed is reporting episode size different than currently exists")
-		Debug("RSS feed size: ", size, "bytes")
-		Debug("Available size:", resp.ContentLength, "bytes")
 	}
 
 	bar := Progress{total: int(resp.ContentLength), totalString: Reduce(int(resp.ContentLength))}
@@ -278,17 +270,23 @@ func (e *Episode) validateData() error {
 }
 
 // buildFilename pieces together the different components of the episode into one absolute-path filename.
-// TODO: Right now, we are always adding a season/episode prefix. A good area of future development would be to make
-// this more intelligent so that it's only added when it doesn't already exist in the title.
+// TODO: Add better logic to determine if the episode/season number is already present.
 func (e *Episode) buildFilename(path string) string {
+	// Get the name of this episode.
 	base := SanitizeTitle(e.Title)
+
+	// Add an episode/season number prefix if not already present.
 	if e.Number != "" {
-		base = e.Number + " " + base
+		prefix := e.Number
 		if e.Season != "" {
-			base = e.Season + "-" + base
+			prefix = e.Season + "-" + prefix
+		}
+		if !strings.HasPrefix(base, prefix) {
+			base = prefix + " " + base
 		}
 	}
 
+	// Add a filetype suffix if not already present.
 	ext := mimeToExt(e.Enclosure.Type)
 	if !strings.HasSuffix(base, ext) {
 		base += ext
