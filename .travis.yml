@@ -4,7 +4,9 @@ language: go
 go_import_path: github.com/snhilde/getcast
 
 install:
-    make install-tools
+    go mod download
+	go get golang.org/x/lint/golint
+	go install golang.org/x/lint/golint
 
 script:
     - make fmt-check
