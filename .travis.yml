@@ -3,6 +3,9 @@ language: go
 
 go_import_path: github.com/snhilde/getcast
 
+install:
+    make install-tools
+
 script:
     - make fmt-check
     - make lint-check

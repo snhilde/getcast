@@ -14,6 +14,11 @@ fmt-check:
 fmt:
 	@gofmt -s -w $(GOFILES)
 
+# Install necessary tools.
+.PHONY: install-tools
+install-tools:
+	@go install golang.org/x/lint/golint
+
 # Run golint across all .go files. A confidence interval of 0.3 will not error out when files in the package don't have
 # a standard package header comment. If any of the files fail the lint test, then we'll exit with a status of 1. We
 # don't want to exit at the first failure, though, because we want all failures to be logged together.
