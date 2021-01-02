@@ -1,0 +1,9 @@
+sudo: false
+language: go
+
+go_import_path: github.com/snhilde/getcast
+
+script:
+    - make fmt-check
+    - make lint-check
+    - make test
