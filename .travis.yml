@@ -3,6 +3,9 @@ language: go
 
 go_import_path: github.com/snhilde/getcast
 
+env:
+    GO111MODULE=on
+
 install:
     - go mod download
     - go get golang.org/x/lint/golint
