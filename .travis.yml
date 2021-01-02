@@ -1,21 +1,21 @@
-dist:
-    - bionic
+language: go
+go: 1.15.x
+go_import_path: github.com/snhilde/getcast
 
-language:
-    - go
+dist: bionic
+sudo: required
 
-go:
-    - 1.15.x
+cache:
+    apt: true
 
-go_import_path:
-    - github.com/snhilde/getcast
+addons:
+    apt:
+        packages:
+            - ffmpeg
+        update: true
 
 env:
     - GO111MODULE=on
-
-before_install:
-    - sudo apt update
-    - sudo apt install -f ffmpeg
 
 install:
     - go mod download
