@@ -110,7 +110,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 				Log("Error downloading episode:", err)
 				if errors.Is(err, syscall.ENOSPC) {
 					// If there's no space left for writing, then we'll stop the entire process.
-					return success, errors.New("No space left on disk, stopping process")
+					return success, fmt.Errorf("No space left on disk, stopping process")
 				}
 				break
 			} else {

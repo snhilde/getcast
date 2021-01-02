@@ -1,13 +1,12 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
 
 var (
-	errDownload = errors.New("Error downloading correct data")
+	errDownload = fmt.Errorf("Error downloading correct data")
 )
 
 // Progress is used to keep track during the download process and to display a progress bar during the operation.
