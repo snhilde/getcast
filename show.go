@@ -18,7 +18,7 @@ import (
 // Show is the main type. It holds information about the podcast and its episodes.
 type Show struct {
 	URL      *url.URL
-	Dir      string    // show's directory on disk
+	Dir            string    // show's directory on disk
 	Title    string    `xml:"channel>title"`
 	Author   string    `xml:"channel>author"`
 	Image    string    `xml:"channel>image,href"`
