@@ -1,5 +1,5 @@
 ![Maintenance Badge](https://img.shields.io/badge/Maintained-yes-success)
-![Version Badge](https://img.shields.io/badge/Version-1.3-informational)
+![Version Badge](https://img.shields.io/badge/Version-1.4.0-informational)
 [![GoReportCard example](https://goreportcard.com/badge/github.com/snhilde/getcast)](https://goreportcard.com/report/github.com/snhilde/getcast)
 
 # getcast
