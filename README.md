@@ -1,6 +1,7 @@
 ![Maintenance Badge](https://img.shields.io/badge/Maintained-yes-success)
 ![Version Badge](https://img.shields.io/badge/Version-1.4.0-informational)
 [![GoReportCard example](https://goreportcard.com/badge/github.com/snhilde/getcast)](https://goreportcard.com/report/github.com/snhilde/getcast)
+[![Build Status](https://travis-ci.com/snhilde/getcast.svg?branch=master)](https://travis-ci.com/snhilde/getcast)
 
 # getcast
 `getcast` is a utility for archiving podcasts.
