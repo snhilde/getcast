@@ -36,4 +36,4 @@ lint-check:
 # Run the tests.
 .PHONY: test
 test:
-	@go test
+	@go test -v ./...
