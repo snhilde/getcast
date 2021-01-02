@@ -171,7 +171,7 @@ func (s *Show) filter(specificEp string) error {
 	}
 
 	if specificEp != "" {
-		Log("Looking for specified episode")
+		Log("\nLooking for specified episode")
 		if ep, found := findSpecific(s.Episodes, specificEp); found {
 			s.Episodes = []Episode{ep}
 		} else {

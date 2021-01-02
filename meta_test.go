@@ -68,22 +68,22 @@ var localFiles = []localData{
 }
 
 // We're going to use these podcast episodes to test our ability to download an episode and read and write the correct
-// metadata. We're going to use podcasts in which we have reasonable confidence that the files will remain online for a
-// long time and the metadata will not change.
+// metadata. I tried to choose podcasts in which there is a reasonable confidence that the files will remain online for
+// a long time and the metadata will not change.
 var onlineFiles = []remoteData{
 	// This episode uses ID3v2.3 tags.
-	// The pubDate for this episode ends in "+0000".
-	{"The Joe Rogan Experience", "http://joeroganexp.joerogan.libsynpro.com/rss", "1000",
-		localData{"Joe Rogan", "1000 #1000 - Joey Diaz & Tom Segura.mp3", -1, []refFrame{
-			{"TPE1", "artist", "Joe Rogan"},
-			{"TPE2", "album_artist", "Joe Rogan"},
-			{"TALB", "album", "The Joe Rogan Experience"},
-			{"TIT2", "title", "#1000 - Joey Diaz & Tom Segura"},
+	{"99% Invisible", "https://feeds.99percentinvisible.org/99percentinvisible", "333",
+		localData{"Roman Mars", "333- Mini-Stories- Volume 5.mp3", -1, []refFrame{
+			{"TPE1", "artist", "Roman Mars"},
+			{"TPE2", "album_artist", "Roman Mars"},
+			{"TALB", "album", "99% Invisible"},
+			{"TIT2", "title", "333- Mini-Stories: Volume 5"},
 			{"TCON", "genre", "Podcast"},
-			{"TRCK", "track", "1000"},
-			{"TYER", "year", "2017"},
-			{"TDAT", "date", "1808"},
-			{"TIME", "time", "2343"},
+			{"PCST", "podcast", "1"},
+			{"TRCK", "track", "333"},
+			{"TYER", "year", "2018"},
+			{"TDAT", "date", "1812"},
+			{"TIME", "time", "2307"},
 		}}},
 
 	// This episode uses ID3v2.2 tags and also tests the ability to handle seasons.
