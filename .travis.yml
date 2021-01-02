@@ -3,10 +3,14 @@ language: go
 
 go_import_path: github.com/snhilde/getcast
 
+before_install:
+    - export GOPATH=${HOME}/go
+    - mkdir ${HOME}/go
+
 install:
-    go mod download
-	go get golang.org/x/lint/golint
-	go install golang.org/x/lint/golint
+    - go mod download
+    - go get golang.org/x/lint/golint
+    - go install golang.org/x/lint/golint
 
 script:
     - make fmt-check
