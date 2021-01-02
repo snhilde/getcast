@@ -207,7 +207,6 @@ func probeMeta(t *testing.T, name string, filepath string, frames []refFrame) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Error(name, "- Error with ffprobe:", err)
-		t.Log("\tUsed path", filepath)
 		return
 	}
 
