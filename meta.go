@@ -39,7 +39,7 @@ func NewMeta(file []byte) *Meta {
 // writing to the buffer and return (n, io.EOF), with n designating how many bytes were consumed in this operation.
 func (m *Meta) Write(p []byte) (int, error) {
 	if m == nil {
-		return 0, fmt.Errorf("Invalid meta object")
+		return 0, fmt.Errorf("invalid meta object")
 	}
 
 	if m.buffer == nil {

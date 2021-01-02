@@ -43,7 +43,7 @@ type Episode struct {
 //             \-> Progress object   \-> Meta object
 func (e *Episode) Download(showDir string) error {
 	if showDir == "" {
-		return fmt.Errorf("Missing download directory")
+		return fmt.Errorf("missing download directory")
 	}
 
 	if err := e.validateData(); err != nil {
@@ -93,9 +93,9 @@ func (e *Episode) Download(showDir string) error {
 // Write first constructs and then writes the episode's metadata and then passes all remaining data on to the next layer.
 func (e *Episode) Write(p []byte) (int, error) {
 	if e == nil {
-		return 0, fmt.Errorf("Invalid episode object")
+		return 0, fmt.Errorf("invalid episode object")
 	} else if e.w == nil {
-		return 0, fmt.Errorf("Invalid writer")
+		return 0, fmt.Errorf("invalid writer")
 	}
 
 	consumed := 0
@@ -117,7 +117,7 @@ func (e *Episode) Write(p []byte) (int, error) {
 		if n, err := e.w.Write(metadata); err != nil {
 			return consumed, err
 		} else if n != len(metadata) {
-			return consumed, fmt.Errorf("Failed to write complete metadata")
+			return consumed, fmt.Errorf("failed to write complete metadata")
 		}
 
 		// Metadata has been written. At this point, the next bytes are audio data. Let's do a quick sanity check that
@@ -248,17 +248,17 @@ func (e *Episode) addFrames() {
 // validateData checks that we have all of the required fields from the RSS feed.
 func (e *Episode) validateData() error {
 	if e == nil {
-		return fmt.Errorf("Cannot validata data: Bad episode object")
+		return fmt.Errorf("cannot validata data: bad episode object")
 	}
 
 	Debug("Validating episode title:", e.Title)
 	if e.Title == "" {
-		return fmt.Errorf("Missing episode title")
+		return fmt.Errorf("missing episode title")
 	}
 
 	Debug("Validating episode link:", e.Enclosure.URL)
 	if e.Enclosure.URL == "" {
-		return fmt.Errorf("Missing download link")
+		return fmt.Errorf("missing download link")
 	}
 
 	Debug("Validating episode number:", e.Number)

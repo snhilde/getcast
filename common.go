@@ -106,7 +106,7 @@ func ValidateDir(path string) error {
 
 		// Check for read permission.
 		if !(isUser && uRead) && !(isGroup && gRead) && !oRead {
-			return fmt.Errorf("Cannot read %v", path)
+			return fmt.Errorf("cannot read %v", path)
 		}
 
 		// Find out which of the directory's user, group, and other write bits are set.
@@ -116,7 +116,7 @@ func ValidateDir(path string) error {
 
 		// Check for write permission.
 		if !(isUser && uWrite) && !(isGroup && gWrite) && !oWrite {
-			return fmt.Errorf("Cannot write to %v", path)
+			return fmt.Errorf("cannot write to %v", path)
 		}
 	}
 

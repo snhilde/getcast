@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	errDownload = fmt.Errorf("Error downloading correct data")
+	errDownload = fmt.Errorf("error downloading correct data")
 )
 
 // Progress is used to keep track during the download process and to display a progress bar during the operation.

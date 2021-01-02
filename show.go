@@ -29,22 +29,22 @@ type Show struct {
 func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	resp, err := http.Get(s.URL.String())
 	if err != nil {
-		return 0, fmt.Errorf("Error getting RSS feed: %v", err)
+		return 0, fmt.Errorf("error getting RSS feed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("Error reading RSS feed: %v", err)
+		return 0, fmt.Errorf("error reading RSS feed: %v", err)
 	}
 
 	if err := xml.Unmarshal(data, s); err != nil {
-		return 0, fmt.Errorf("Error reading RSS feed: %v", err)
+		return 0, fmt.Errorf("error reading RSS feed: %v", err)
 	}
 	if s.Title == "" {
-		return 0, fmt.Errorf("Error parsing RSS feed: No show information found")
+		return 0, fmt.Errorf("error parsing RSS feed: no show information found")
 	} else if len(s.Episodes) == 0 {
-		return 0, fmt.Errorf("Error parsing RSS feed: No episodes found")
+		return 0, fmt.Errorf("error parsing RSS feed: no episodes found")
 	}
 
 	// The feed will list episodes newest to oldest. We'll reverse that here to make error handling easier later on.
@@ -66,18 +66,18 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	// Validate (or create) this show's directory.
 	s.Dir = filepath.Join(mainDir, s.Title)
 	if err := ValidateDir(s.Dir); err != nil {
-		return 0, fmt.Errorf("Invalid show directory: %v", err)
+		return 0, fmt.Errorf("invalid show directory: %v", err)
 	}
 
 	// Choose which episodes we want to download.
 	if err := s.filter(specificEp); err != nil {
-		return 0, fmt.Errorf("Error selecting episodes: %v", err)
+		return 0, fmt.Errorf("error selecting episodes: %v", err)
 	}
 
 	switch len(s.Episodes) {
 	case 0:
 		if specificEp != "" {
-			return 0, fmt.Errorf("Episode %v not found", specificEp)
+			return 0, fmt.Errorf("episode %v not found", specificEp)
 		}
 		Log("No new episodes")
 		return 0, nil
@@ -110,7 +110,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 				Log("Error downloading episode:", err)
 				if errors.Is(err, syscall.ENOSPC) {
 					// If there's no space left for writing, then we'll stop the entire process.
-					return success, fmt.Errorf("No space left on disk, stopping process")
+					return success, fmt.Errorf("no space left on disk, stopping process")
 				}
 				break
 			} else {
