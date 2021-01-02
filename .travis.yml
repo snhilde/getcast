@@ -9,6 +9,9 @@ go_import_path: github.com/snhilde/getcast
 env:
     GO111MODULE=on
 
+before_install:
+    - sudo apt install ffmpeg
+
 install:
     - go mod download
     - go get golang.org/x/lint/golint
