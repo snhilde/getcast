@@ -2,7 +2,7 @@ sudo: false
 language: go
 
 go:
-    1.15.x
+    - 1.15.x
 
 go_import_path: github.com/snhilde/getcast
 
