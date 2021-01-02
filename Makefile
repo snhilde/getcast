@@ -17,6 +17,7 @@ fmt:
 # Install necessary tools.
 .PHONY: install-tools
 install-tools:
+	@go get golang.org/x/lint/golint
 	@go install golang.org/x/lint/golint
 
 # Run golint across all .go files. A confidence interval of 0.3 will not error out when files in the package don't have
