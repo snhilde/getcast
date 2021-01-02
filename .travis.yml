@@ -14,8 +14,7 @@ env:
 
 before_install:
     - sudo apt update
-    - sudo apt install ffmpeg
-    - sudo apt install -f
+    - sudo apt install -f ffmpeg
 
 install:
     - go mod download
