@@ -13,7 +13,9 @@ env:
     - GO111MODULE=on
 
 before_install:
+    - sudo apt update
     - sudo apt install ffmpeg
+    - sudo apt install -f
 
 install:
     - go mod download
