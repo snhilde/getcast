@@ -23,6 +23,6 @@ install:
     - go install golang.org/x/lint/golint
 
 script:
-    - make fmt
-    - make lint
+    - make fmt-check
+    - make lint-check
     - make test
