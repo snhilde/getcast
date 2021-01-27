@@ -47,6 +47,8 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 		return 0, fmt.Errorf("error parsing RSS feed: no episodes found")
 	}
 
+	Log("Found show:", s.Title)
+
 	// The feed will list episodes newest to oldest. We'll reverse that here to make error handling easier later on.
 	length := len(s.Episodes)
 	for i := 0; i < length/2; i++ {

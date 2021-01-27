@@ -45,7 +45,6 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	Log("Beginning sync process")
 
 	u, err := url.Parse(strings.ToLower(*urlArg))
 	if err != nil {
@@ -70,6 +69,7 @@ func main() {
 	}
 
 	// And sync the show.
+	Log("Beginning sync process for", show.URL)
 	n, err := show.Sync(dir, *numArg)
 	Log("")
 	Log("Synced", n, "episodes")
