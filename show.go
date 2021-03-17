@@ -26,25 +26,25 @@ type Show struct {
 }
 
 // Sync gets the current list of available episodes, determines which of them need to be downloaded, and then gets them.
-func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
+func (s *Show) Sync(mainDir string, specificEp string) (int, int, error) {
 	resp, err := http.Get(s.URL.String())
 	if err != nil {
-		return 0, fmt.Errorf("error getting RSS feed: %v", err)
+		return 0, 0, fmt.Errorf("error getting RSS feed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("error reading RSS feed: %v", err)
+		return 0, 0, fmt.Errorf("error reading RSS feed: %v", err)
 	}
 
 	if err := xml.Unmarshal(data, s); err != nil {
-		return 0, fmt.Errorf("error reading RSS feed: %v", err)
+		return 0, 0, fmt.Errorf("error reading RSS feed: %v", err)
 	}
 	if s.Title == "" {
-		return 0, fmt.Errorf("error parsing RSS feed: no show information found")
+		return 0, 0, fmt.Errorf("error parsing RSS feed: no show information found")
 	} else if len(s.Episodes) == 0 {
-		return 0, fmt.Errorf("error parsing RSS feed: no episodes found")
+		return 0, 0, fmt.Errorf("error parsing RSS feed: no episodes found")
 	}
 
 	Log("Found show:", s.Title)
@@ -68,21 +68,21 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	// Validate (or create) this show's directory.
 	s.Dir = filepath.Join(mainDir, s.Title)
 	if err := ValidateDir(s.Dir); err != nil {
-		return 0, fmt.Errorf("invalid show directory: %v", err)
+		return 0, 0, fmt.Errorf("invalid show directory: %v", err)
 	}
 
 	// Choose which episodes we want to download.
 	if err := s.filter(specificEp); err != nil {
-		return 0, fmt.Errorf("error selecting episodes: %v", err)
+		return 0, 0, fmt.Errorf("error selecting episodes: %v", err)
 	}
 
 	switch len(s.Episodes) {
 	case 0:
 		if specificEp != "" {
-			return 0, fmt.Errorf("episode %v not found", specificEp)
+			return 0, 0, fmt.Errorf("episode %v not found", specificEp)
 		}
 		Log("No new episodes")
-		return 0, nil
+		return 0, 0, nil
 	case 1:
 		Log("Downloading 1 episode")
 	default:
@@ -90,6 +90,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 	}
 
 	success := 0
+	failures := 0
 	for _, episode := range s.Episodes {
 		message := fmt.Sprintf("\n--- Downloading %s", episode.Title)
 		if episode.Season != "" && episode.Number != "" {
@@ -106,13 +107,15 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 					Log("Download attempt", j, "of 3 failed, trying again")
 				} else {
 					Log("ERROR: All 3 download attempts failed")
+					failures++
 					break
 				}
 			} else if err != nil {
 				Log("Error downloading episode:", err)
+				failures++
 				if errors.Is(err, syscall.ENOSPC) {
 					// If there's no space left for writing, then we'll stop the entire process.
-					return success, fmt.Errorf("no space left on disk, stopping process")
+					return success, failures, fmt.Errorf("no space left on disk, stopping process")
 				}
 				break
 			} else {
@@ -122,7 +125,7 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, error) {
 		}
 	}
 
-	return success, nil
+	return success, failures, nil
 }
 
 // filter filters out the episodes we don't want to download.

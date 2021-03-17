@@ -70,9 +70,12 @@ func main() {
 
 	// And sync the show.
 	Log("Beginning sync process for", show.URL)
-	n, err := show.Sync(dir, *numArg)
+	good, bad, err := show.Sync(dir, *numArg)
 	Log("")
-	Log("Synced", n, "episodes")
+	Log("Synced", good, "episodes")
+	if bad > 0 {
+		Log("Failed syncing", bad, "episodes")
+	}
 
 	if err != nil {
 		Log(err)
