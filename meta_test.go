@@ -169,7 +169,7 @@ func TestDownloadEpisode(t *testing.T) {
 
 		// Download the episode.
 		show := Show{URL: u}
-		if n, err := show.Sync("./tests", podcast.number); err != nil {
+		if n, _, err := show.Sync("./tests", podcast.number); err != nil {
 			t.Error(podcast.name, "- Error syncing:", err)
 			continue
 		} else if n != 1 {
