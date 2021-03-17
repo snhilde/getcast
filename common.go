@@ -74,6 +74,12 @@ func SanitizeTitle(name string) string {
 // - Directory has read permissions
 // - Directory has write permissions
 func ValidateDir(path string) error {
+	// Get the absolute path of the directory.
+	if abs, err := filepath.Abs(path); err != nil {
+		return fmt.Errorf("directory error: %v", err)
+	} else {
+		path = abs
+	}
 	Debug("Validating", path)
 
 	// Make sure the path is valid.
