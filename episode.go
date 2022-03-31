@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -154,6 +155,31 @@ func (e *Episode) SetShowImage(image string) {
 	}
 }
 
+// NumberFormatted parses the season and episode numbers and (if present) formats them according to
+// the configured minimum width prefix (if any).
+func (e *Episode) NumberFormatted() string {
+	if e == nil {
+		return ""
+	}
+
+	s := e.Season
+
+	if e.Number != "" {
+		if n, err := strconv.ParseInt(e.Number, 10, 0); err == nil {
+			formatted := fmt.Sprintf("%0*v", PrefixMinWidth, n)
+			if s == "" {
+				s = formatted
+			} else {
+				s += "-" + formatted
+			}
+		} else {
+			Debug("Error parsing episode number:", err)
+		}
+	}
+
+	return s
+}
+
 // addFrames fleshes out the metadata with information from the episode. If a frame already exists in the metadata, it
 // will not be overwritten with data from the RSS feed. The only exceptions to this rule are the show and episode
 // titles, which must match the data from the RSS feed to sync properly.
@@ -276,11 +302,7 @@ func (e *Episode) buildFilename(path string) string {
 	base := SanitizeTitle(e.Title)
 
 	// Add an episode/season number prefix if not already present.
-	if e.Number != "" {
-		prefix := e.Number
-		if e.Season != "" {
-			prefix = e.Season + "-" + prefix
-		}
+	if prefix := e.NumberFormatted(); prefix != "" {
 		if !strings.HasPrefix(base, prefix) {
 			base = prefix + " " + base
 		}

@@ -15,6 +15,9 @@ var (
 
 	// LogFile is the file where we will write all log/debug statements.
 	LogFile *os.File
+
+	// Minimum width of episode number prefix.
+	PrefixMinWidth int
 )
 
 func main() {
@@ -22,6 +25,7 @@ func main() {
 	dirArg := flag.String("d", "", "Required. Main download directory for all podcasts")
 	numArg := flag.String("n", "", "Optional. Episode number to download. If podcast also has season, specify the episode like this: seasonNum-episodeNum, e.g. 3-5 to download episode 5 of season 3.")
 	logArg := flag.String("l", "", "Optional. Path to log, for writing all debug and non-debug statements")
+	minWidthArg := flag.Int("m", 0, "Optional. Minimum width of digits for episode number in filename.")
 	debugFlag := flag.Bool("v", false, "Enable debug mode")
 	flag.Parse()
 
@@ -37,6 +41,10 @@ func main() {
 			LogFile = file
 			defer LogFile.Close()
 		}
+	}
+
+	if *minWidthArg > 0 {
+		PrefixMinWidth = *minWidthArg
 	}
 
 	if *urlArg == "" {

@@ -93,10 +93,8 @@ func (s *Show) Sync(mainDir string, specificEp string) (int, int, error) {
 	failures := 0
 	for _, episode := range s.Episodes {
 		message := fmt.Sprintf("\n--- Downloading %s", episode.Title)
-		if episode.Season != "" && episode.Number != "" {
-			message += fmt.Sprintf(" (%s-%s)", episode.Season, episode.Number)
-		} else if episode.Number != "" {
-			message += fmt.Sprintf(" (%s)", episode.Number)
+		if num := episode.NumberFormatted(); num != "" {
+			message += fmt.Sprintf(" (%s)", num)
 		}
 		message += " ---"
 		Log(message)
