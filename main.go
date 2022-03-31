@@ -81,8 +81,13 @@ func main() {
 	good, bad, err := show.Sync(dir, *numArg)
 	Log("")
 	Log("Synced", good, "episodes")
-	if bad > 0 {
-		Log("Failed syncing", bad, "episodes")
+	switch bad {
+	case 0:
+		Log("All episodes synced successfully")
+	case 1:
+		Log("Failed to sync 1 episode")
+	default:
+		Log("Failed to sync", bad, "episodes")
 	}
 
 	if err != nil {
